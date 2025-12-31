@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --use-npm --no-turbopack)",
+      "Bash(xcopy:*)",
+      "Bash(npm install:*)",
+      "Bash(npx prisma init)",
+      "Bash(cat:*)",
+      "Bash(npx prisma generate:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(npm run build:*)"
+    ]
+  }
+}
