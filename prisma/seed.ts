@@ -1,6 +1,16 @@
 import { PrismaClient, UserRole } from "@prisma/client";
+import argon2 from "argon2";
 
 const prisma = new PrismaClient();
+
+async function hashPassword(password: string): Promise<string> {
+  return argon2.hash(password, {
+    type: argon2.argon2id,
+    memoryCost: 65536,
+    timeCost: 3,
+    parallelism: 4,
+  });
+}
 
 async function main() {
   const tenantName = process.env.DEFAULT_TENANT_NAME || "Demo Organization";
@@ -32,11 +42,12 @@ async function main() {
   });
 
   if (!user) {
+    const passwordHash = await hashPassword(adminPassword);
     user = await prisma.user.create({
       data: {
         tenantId: tenant.id,
         email: adminEmail,
-        passwordHash: adminPassword, // Plain text for now, T1.2 will hash
+        passwordHash,
         name: adminName,
         role: UserRole.OWNER,
       },

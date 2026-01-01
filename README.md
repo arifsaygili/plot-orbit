@@ -103,6 +103,32 @@ Environment değişkenleri ile özelleştirilebilir:
 
 Seed idempotent'tir - birden fazla çalıştırılabilir, duplicate oluşturmaz.
 
+## Authentication
+
+Uygulama session-based authentication kullanır.
+
+### Sayfalar
+
+| Sayfa | Açıklama |
+|-------|----------|
+| `/register` | Yeni tenant + kullanıcı kaydı |
+| `/login` | Giriş |
+| `/dashboard` | Ana panel (login gerekli) |
+
+### API Endpoints
+
+| Endpoint | Method | Açıklama |
+|----------|--------|----------|
+| `/api/auth/register` | POST | Yeni tenant + kullanıcı oluştur |
+| `/api/auth/login` | POST | Giriş yap |
+| `/api/auth/logout` | POST | Çıkış yap |
+| `/api/auth/me` | GET | Mevcut kullanıcı bilgisi |
+
+### Varsayılan Giriş Bilgileri (Seed)
+
+- **Email:** admin@example.com
+- **Password:** changeme123
+
 ## Tech Stack
 
 - **Framework:** Next.js 16 (App Router)
@@ -110,4 +136,6 @@ Seed idempotent'tir - birden fazla çalıştırılabilir, duplicate oluşturmaz.
 - **Database:** PostgreSQL 16
 - **ORM:** Prisma
 - **3D Globe:** CesiumJS
+- **Auth:** Custom session (argon2 + httpOnly cookies)
+- **Validation:** Zod
 - **Styling:** Tailwind CSS
