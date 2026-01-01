@@ -129,6 +129,55 @@ Uygulama session-based authentication kullanır.
 - **Email:** admin@example.com
 - **Password:** changeme123
 
+## Authorization & Tenant Isolation
+
+### Route Protection
+
+| Route Pattern | Koruma |
+|---------------|--------|
+| `/dashboard/**` | Auth gerekli (redirect → /login) |
+| `/api/**` (korumalı) | Auth gerekli (401 JSON) |
+| `/`, `/login`, `/register`, `/viewer` | Public |
+| `/api/auth/*` | Public |
+
+### Server Component Auth
+
+```typescript
+import { requireAuth } from "@/server/auth";
+
+export default async function ProtectedPage() {
+  const { user, tenant } = await requireAuth();
+  // redirect to /login if not authenticated
+}
+```
+
+### API Route Auth
+
+```typescript
+import { requireAuthApi } from "@/server/auth";
+
+export async function GET() {
+  const { auth, error } = await requireAuthApi();
+  if (error) return error; // 401 response
+
+  // auth.user, auth.tenant available
+}
+```
+
+### Tenant-Scoped Database
+
+```typescript
+import { requireAuth } from "@/server/auth";
+import { createTenantDb } from "@/server/db/tenantDb";
+
+export default async function Page() {
+  const auth = await requireAuth();
+  const db = createTenantDb(auth);
+
+  const users = await db.user.findMany(); // only tenant's users
+}
+```
+
 ## Tech Stack
 
 - **Framework:** Next.js 16 (App Router)

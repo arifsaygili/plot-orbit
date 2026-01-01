@@ -1,4 +1,4 @@
-import { PrismaClient, UserRole } from "@prisma/client";
+import { PrismaClient, UserRole, PlanCode } from "@prisma/client";
 import argon2 from "argon2";
 
 const prisma = new PrismaClient();
@@ -13,6 +13,18 @@ async function hashPassword(password: string): Promise<string> {
 }
 
 async function main() {
+  // Seed FREE plan (idempotent)
+  const freePlan = await prisma.plan.upsert({
+    where: { code: PlanCode.FREE },
+    update: {},
+    create: {
+      code: PlanCode.FREE,
+      name: "Free Plan",
+      lifetimeVideoLimit: 1,
+    },
+  });
+  console.log(`FREE plan ready: ${freePlan.name} (limit: ${freePlan.lifetimeVideoLimit})`);
+
   const tenantName = process.env.DEFAULT_TENANT_NAME || "Demo Organization";
   const tenantSlug = process.env.DEFAULT_TENANT_SLUG || "demo";
   const adminEmail = process.env.DEFAULT_ADMIN_EMAIL || "admin@example.com";
@@ -34,6 +46,41 @@ async function main() {
     console.log(`Created tenant: ${tenant.name} (${tenant.slug})`);
   } else {
     console.log(`Tenant already exists: ${tenant.name} (${tenant.slug})`);
+  }
+
+  // Ensure tenant has FREE plan assigned
+  const existingTenantPlan = await prisma.tenantPlan.findFirst({
+    where: { tenantId: tenant.id, isActive: true },
+  });
+
+  if (!existingTenantPlan) {
+    await prisma.tenantPlan.create({
+      data: {
+        tenantId: tenant.id,
+        planId: freePlan.id,
+        isActive: true,
+      },
+    });
+    console.log(`Assigned FREE plan to tenant: ${tenant.slug}`);
+  } else {
+    console.log(`Tenant already has active plan: ${tenant.slug}`);
+  }
+
+  // Ensure tenant has usage record
+  const existingUsage = await prisma.tenantUsage.findUnique({
+    where: { tenantId: tenant.id },
+  });
+
+  if (!existingUsage) {
+    await prisma.tenantUsage.create({
+      data: {
+        tenantId: tenant.id,
+        videosCreatedLifetime: 0,
+      },
+    });
+    console.log(`Created usage record for tenant: ${tenant.slug}`);
+  } else {
+    console.log(`Tenant already has usage record: ${tenant.slug}`);
   }
 
   // Check if admin user exists

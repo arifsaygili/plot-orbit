@@ -13,6 +13,22 @@ enum UserRole {
   MEMBER
 }
 
+enum PlanCode {
+  FREE
+  PRO
+}
+
+model Plan {
+  id                 String   @id @default(cuid())
+  code               PlanCode @unique
+  name               String
+  lifetimeVideoLimit Int
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  tenantPlans TenantPlan[]
+}
+
 model Tenant {
   id        String   @id @default(cuid())
   name      String
@@ -20,8 +36,35 @@ model Tenant {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users    User[]
-  sessions Session[]
+  users       User[]
+  sessions    Session[]
+  tenantPlans TenantPlan[]
+  usage       TenantUsage?
+}
+
+model TenantPlan {
+  id        String    @id @default(cuid())
+  tenantId  String
+  planId    String
+  isActive  Boolean   @default(true)
+  startedAt DateTime  @default(now())
+  endedAt   DateTime?
+  createdAt DateTime  @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan   Plan   @relation(fields: [planId], references: [id])
+
+  @@index([tenantId])
+  @@index([isActive])
+}
+
+model TenantUsage {
+  id                    String   @id @default(cuid())
+  tenantId              String   @unique
+  videosCreatedLifetime Int      @default(0)
+  updatedAt             DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }
 
 model User {

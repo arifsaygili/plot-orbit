@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hashPassword, registerSchema, createSession } from "@/lib/auth";
-import { UserRole } from "@prisma/client";
+import { UserRole, PlanCode } from "@prisma/client";
 
 export async function POST(request: Request) {
   try {
@@ -45,8 +45,17 @@ export async function POST(request: Request) {
     // Hash password
     const passwordHash = await hashPassword(password);
 
-    // Create tenant and user in a transaction
+    // Create tenant, user, plan assignment, and usage in a transaction
     const { tenant, user } = await prisma.$transaction(async (tx) => {
+      // Get FREE plan
+      const freePlan = await tx.plan.findUnique({
+        where: { code: PlanCode.FREE },
+      });
+
+      if (!freePlan) {
+        throw new Error("FREE plan not found. Run seed first.");
+      }
+
       const tenant = await tx.tenant.create({
         data: {
           name: tenantName,
@@ -61,6 +70,23 @@ export async function POST(request: Request) {
           passwordHash,
           name,
           role: UserRole.OWNER,
+        },
+      });
+
+      // Assign FREE plan to tenant
+      await tx.tenantPlan.create({
+        data: {
+          tenantId: tenant.id,
+          planId: freePlan.id,
+          isActive: true,
+        },
+      });
+
+      // Initialize tenant usage
+      await tx.tenantUsage.create({
+        data: {
+          tenantId: tenant.id,
+          videosCreatedLifetime: 0,
         },
       });
 
