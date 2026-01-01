@@ -1,11 +1,9 @@
 import { cookies } from "next/headers";
 import { createHash, randomBytes } from "crypto";
 import { prisma } from "@/lib/prisma";
+import { SESSION_COOKIE_NAME, SESSION_DURATION_MS } from "./constants";
 
-const SESSION_COOKIE_NAME = "session_token";
-const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
-
-function hashToken(token: string): string {
+export function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
