@@ -27,11 +27,12 @@ cp .env.example .env
 docker compose up -d
 ```
 
-### 4. Prisma migration'ı çalıştır
+### 4. Prisma migration ve seed çalıştır
 
 ```bash
 npx prisma generate
 npx prisma migrate dev --name init
+npm run db:seed
 ```
 
 ### 5. Geliştirme sunucusunu başlat
@@ -50,8 +51,9 @@ Tarayıcıda [http://localhost:3000](http://localhost:3000) adresini aç.
 | `npm run build` | Production build |
 | `npm start` | Production sunucu |
 | `npm run copy-cesium` | Cesium assets kopyala |
-| `npx prisma studio` | Prisma Studio (DB GUI) |
-| `npx prisma migrate dev` | Yeni migration oluştur |
+| `npm run db:migrate` | Prisma migration |
+| `npm run db:seed` | Seed verileri oluştur |
+| `npm run db:studio` | Prisma Studio (DB GUI) |
 | `docker compose up -d` | PostgreSQL başlat |
 | `docker compose down` | PostgreSQL durdur |
 
@@ -84,6 +86,22 @@ postgresql://USER:PASSWORD@HOST:PORT/DATABASE?schema=SCHEMA
 ```
 postgresql://postgres:postgres@localhost:5432/plot_orbit?schema=public
 ```
+
+## Seed Verileri
+
+Seed script varsayılan bir tenant ve admin kullanıcı oluşturur.
+
+Environment değişkenleri ile özelleştirilebilir:
+
+| Değişken | Varsayılan |
+|----------|------------|
+| `DEFAULT_TENANT_NAME` | Demo Organization |
+| `DEFAULT_TENANT_SLUG` | demo |
+| `DEFAULT_ADMIN_EMAIL` | admin@example.com |
+| `DEFAULT_ADMIN_PASSWORD` | changeme123 |
+| `DEFAULT_ADMIN_NAME` | Admin User |
+
+Seed idempotent'tir - birden fazla çalıştırılabilir, duplicate oluşturmaz.
 
 ## Tech Stack
 

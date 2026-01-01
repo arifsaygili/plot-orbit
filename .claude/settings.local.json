@@ -10,7 +10,13 @@
       "Bash(npm uninstall:*)",
       "Bash(npm run build:*)",
       "Bash(mkdir:*)",
-      "Bash(npm run copy-cesium:*)"
+      "Bash(npm run copy-cesium:*)",
+      "Bash(npx prisma migrate:*)",
+      "Bash(docker exec:*)",
+      "Bash(netstat:*)",
+      "Bash(ss:*)",
+      "Bash(docker compose:*)",
+      "Bash(npm run db:seed:*)"
     ]
   }
 }
