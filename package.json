@@ -4,15 +4,18 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "npm run copy-cesium && next build",
     "start": "next start",
     "lint": "eslint",
+    "copy-cesium": "node scripts/copy-cesium-assets.mjs",
+    "postinstall": "npm run copy-cesium",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
+    "cesium": "^1.136.0",
     "next": "16.1.1",
     "react": "19.2.3",
     "react-dom": "19.2.3"
@@ -25,7 +28,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.1.1",
     "prisma": "^5.22.0",
-    "tailwindcss": "^4",
+    "tailwindcss": "^4.1.18",
     "typescript": "^5"
   }
 }

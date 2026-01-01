@@ -8,7 +8,9 @@
       "Bash(cat:*)",
       "Bash(npx prisma generate:*)",
       "Bash(npm uninstall:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(mkdir:*)",
+      "Bash(npm run copy-cesium:*)"
     ]
   }
 }

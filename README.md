@@ -49,10 +49,30 @@ Tarayıcıda [http://localhost:3000](http://localhost:3000) adresini aç.
 | `npm run dev` | Geliştirme sunucusu |
 | `npm run build` | Production build |
 | `npm start` | Production sunucu |
+| `npm run copy-cesium` | Cesium assets kopyala |
 | `npx prisma studio` | Prisma Studio (DB GUI) |
 | `npx prisma migrate dev` | Yeni migration oluştur |
 | `docker compose up -d` | PostgreSQL başlat |
 | `docker compose down` | PostgreSQL durdur |
+
+## CesiumJS
+
+3D globe viewer `/viewer` adresinde çalışır.
+
+### Cesium Assets
+
+Cesium static assets `npm install` sırasında otomatik olarak `public/cesium` klasörüne kopyalanır.
+
+Manuel kopyalamak için:
+```bash
+npm run copy-cesium
+```
+
+### Notlar
+
+- Cesium sadece client-side render edilir (SSR yok)
+- Assets `/cesium` path'inden servis edilir
+- Cesium versiyon güncellemesinde `npm install` assets'i yeniler
 
 ## Database URL Formatı
 
@@ -67,8 +87,9 @@ postgresql://postgres:postgres@localhost:5432/plot_orbit?schema=public
 
 ## Tech Stack
 
-- **Framework:** Next.js 15 (App Router)
+- **Framework:** Next.js 16 (App Router)
 - **Language:** TypeScript (strict mode)
 - **Database:** PostgreSQL 16
 - **ORM:** Prisma
+- **3D Globe:** CesiumJS
 - **Styling:** Tailwind CSS
