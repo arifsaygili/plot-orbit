@@ -46,3 +46,6 @@ next-env.d.ts
 
 # Cesium assets (copied from node_modules)
 /public/cesium
+
+# Uploaded files (use S3 in production)
+/uploads

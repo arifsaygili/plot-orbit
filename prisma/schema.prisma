@@ -18,6 +18,11 @@ enum PlanCode {
   PRO
 }
 
+enum FileType {
+  KML
+  KMZ
+}
+
 model Plan {
   id                 String   @id @default(cuid())
   code               PlanCode @unique
@@ -40,6 +45,27 @@ model Tenant {
   sessions    Session[]
   tenantPlans TenantPlan[]
   usage       TenantUsage?
+  files       File[]
+}
+
+model File {
+  id              String   @id @default(cuid())
+  tenantId        String
+  createdByUserId String
+  type            FileType
+  name            String
+  originalName    String
+  mime            String
+  size            Int
+  storageKey      String
+  checksumSha256  String?
+  createdAt       DateTime @default(now())
+
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy User   @relation(fields: [createdByUserId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
 }
 
 model TenantPlan {
@@ -79,6 +105,7 @@ model User {
 
   tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   sessions Session[]
+  files    File[]
 
   @@index([tenantId])
 }
