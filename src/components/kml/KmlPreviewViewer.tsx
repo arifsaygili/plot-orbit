@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { getFileDownloadUrl } from "@/client/api/filesClient";
 import {
   getEntitiesInfo,
@@ -8,10 +8,28 @@ import {
   getDataSourceBoundingInfo,
   highlightEntity,
   unhighlightEntity,
+  initIon,
+  getIonStatus,
+  enableTerrain,
+  disableTerrain,
+  configureCameraLimits,
+  setImageryPreset,
+  applyQualityPreset,
+  setLighting,
+  enableBuildings,
+  disableBuildings,
   type EntityInfo,
   type BoundingInfo,
+  type IonStatus,
+  type OrbitTarget,
 } from "@/lib/cesium";
 import { TargetSelector } from "./TargetSelector";
+import {
+  SceneSettingsPanel,
+  defaultSceneSettings,
+  type SceneSettings,
+} from "./SceneSettingsPanel";
+import { OrbitPanel, useOrbit } from "@/components/orbit";
 import type { Viewer as CesiumViewer, KmlDataSource, Entity } from "cesium";
 
 interface Props {
@@ -27,10 +45,42 @@ export function KmlPreviewViewer({ fileId, fileName }: Props) {
   const selectedEntityRef = useRef<Entity | null>(null);
 
   const [isLoading, setIsLoading] = useState(true);
+  const [isTerrainLoading, setIsTerrainLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [entities, setEntities] = useState<EntityInfo[]>([]);
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
   const [boundingInfo, setBoundingInfo] = useState<BoundingInfo | null>(null);
+  const [ionStatus, setIonStatus] = useState<IonStatus>({
+    initialized: false,
+    enabled: false,
+    error: null,
+  });
+  const [sceneSettings, setSceneSettings] =
+    useState<SceneSettings>(defaultSceneSettings);
+
+  // Convert boundingInfo to OrbitTarget
+  const orbitTarget = useMemo<OrbitTarget | null>(() => {
+    if (!boundingInfo) return null;
+    return {
+      longitude: boundingInfo.center.longitude,
+      latitude: boundingInfo.center.latitude,
+      height: boundingInfo.center.height,
+      suggestedRadiusMeters: boundingInfo.radius,
+    };
+  }, [boundingInfo]);
+
+  // Orbit hook
+  const {
+    orbitState,
+    config: orbitConfig,
+    presetId,
+    setPreset,
+    updateConfig,
+    startOrbit,
+    startPreview,
+    stopOrbit,
+    resetConfig,
+  } = useOrbit(viewerRef.current, cesiumRef.current, orbitTarget);
 
   const handleSelectEntity = useCallback((entityId: string) => {
     const Cesium = cesiumRef.current;
@@ -61,6 +111,53 @@ export function KmlPreviewViewer({ fileId, fileName }: Props) {
     setSelectedEntityId(entityId);
   }, []);
 
+  // Handle settings change
+  const handleSettingsChange = useCallback(
+    async (newSettings: SceneSettings) => {
+      const Cesium = cesiumRef.current;
+      const viewer = viewerRef.current;
+      if (!Cesium || !viewer) return;
+
+      // Terrain toggle
+      if (newSettings.terrainEnabled !== sceneSettings.terrainEnabled) {
+        setIsTerrainLoading(true);
+        if (newSettings.terrainEnabled) {
+          await enableTerrain(viewer, Cesium);
+        } else {
+          await disableTerrain(viewer, Cesium);
+        }
+        setIsTerrainLoading(false);
+      }
+
+      // Imagery preset
+      if (newSettings.imageryPreset !== sceneSettings.imageryPreset) {
+        await setImageryPreset(viewer, newSettings.imageryPreset, Cesium);
+      }
+
+      // Quality preset
+      if (newSettings.qualityPreset !== sceneSettings.qualityPreset) {
+        applyQualityPreset(viewer, newSettings.qualityPreset, Cesium);
+      }
+
+      // Buildings toggle
+      if (newSettings.buildingsEnabled !== sceneSettings.buildingsEnabled) {
+        if (newSettings.buildingsEnabled) {
+          await enableBuildings(viewer, Cesium);
+        } else {
+          disableBuildings(viewer);
+        }
+      }
+
+      // Lighting toggle
+      if (newSettings.lightingEnabled !== sceneSettings.lightingEnabled) {
+        setLighting(viewer, newSettings.lightingEnabled);
+      }
+
+      setSceneSettings(newSettings);
+    },
+    [sceneSettings]
+  );
+
   useEffect(() => {
     let mounted = true;
 
@@ -73,7 +170,8 @@ export function KmlPreviewViewer({ fileId, fileName }: Props) {
         cesiumRef.current = Cesium;
 
         // Set Cesium base URL
-        (window as unknown as { CESIUM_BASE_URL: string }).CESIUM_BASE_URL = "/cesium";
+        (window as unknown as { CESIUM_BASE_URL: string }).CESIUM_BASE_URL =
+          "/cesium";
 
         // Load CSS dynamically
         if (!document.getElementById("cesium-css")) {
@@ -84,11 +182,14 @@ export function KmlPreviewViewer({ fileId, fileName }: Props) {
           document.head.appendChild(link);
         }
 
+        // Initialize Ion
+        const status = await initIon(Cesium);
+        setIonStatus(status);
+
         if (!mounted) return;
 
-        // Create viewer
+        // Create viewer without terrain first (we'll add it based on settings)
         const viewer = new Cesium.Viewer(containerRef.current, {
-          terrain: Cesium.Terrain.fromWorldTerrain(),
           animation: false,
           timeline: false,
           baseLayerPicker: false,
@@ -100,6 +201,20 @@ export function KmlPreviewViewer({ fileId, fileName }: Props) {
         });
 
         viewerRef.current = viewer;
+
+        // Configure camera limits
+        configureCameraLimits(viewer, Cesium);
+
+        // Apply initial settings
+        await setImageryPreset(viewer, defaultSceneSettings.imageryPreset, Cesium);
+        applyQualityPreset(viewer, defaultSceneSettings.qualityPreset, Cesium);
+
+        // Enable terrain if Ion is available and setting is on
+        if (status.enabled && defaultSceneSettings.terrainEnabled) {
+          setIsTerrainLoading(true);
+          await enableTerrain(viewer, Cesium);
+          setIsTerrainLoading(false);
+        }
 
         // Load KML
         const url = getFileDownloadUrl(fileId);
@@ -200,16 +315,43 @@ export function KmlPreviewViewer({ fileId, fileName }: Props) {
 
       <div ref={containerRef} className="w-full h-full" />
 
-      {/* Target Selection Panel */}
+      {/* Panels */}
       {!isLoading && !error && (
-        <div className="absolute top-4 right-4 z-20">
-          <TargetSelector
-            entities={entities}
-            selectedEntityId={selectedEntityId}
-            boundingInfo={boundingInfo}
-            onSelectEntity={handleSelectEntity}
-          />
-        </div>
+        <>
+          {/* Target Selection Panel - Right */}
+          <div className="absolute top-4 right-4 z-20">
+            <TargetSelector
+              entities={entities}
+              selectedEntityId={selectedEntityId}
+              boundingInfo={boundingInfo}
+              onSelectEntity={handleSelectEntity}
+            />
+          </div>
+
+          {/* Scene Settings Panel - Left */}
+          <div className="absolute top-4 left-4 z-20 space-y-4">
+            <SceneSettingsPanel
+              ionStatus={ionStatus}
+              settings={sceneSettings}
+              onSettingsChange={handleSettingsChange}
+              isTerrainLoading={isTerrainLoading}
+            />
+
+            {/* Orbit Controls Panel - Below Scene Settings */}
+            <OrbitPanel
+              config={orbitConfig}
+              orbitState={orbitState}
+              presetId={presetId}
+              onPresetChange={setPreset}
+              onConfigChange={updateConfig}
+              onStart={startOrbit}
+              onPreview={startPreview}
+              onStop={stopOrbit}
+              onReset={resetConfig}
+              disabled={!orbitTarget}
+            />
+          </div>
+        </>
       )}
     </div>
   );
