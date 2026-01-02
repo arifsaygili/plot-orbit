@@ -30,6 +30,7 @@ import {
   type SceneSettings,
 } from "./SceneSettingsPanel";
 import { OrbitPanel, useOrbit } from "@/components/orbit";
+import { RecordPanel, useRecordFlow } from "@/components/record";
 import type { Viewer as CesiumViewer, KmlDataSource, Entity } from "cesium";
 
 interface Props {
@@ -81,6 +82,25 @@ export function KmlPreviewViewer({ fileId, fileName }: Props) {
     stopOrbit,
     resetConfig,
   } = useOrbit(viewerRef.current, cesiumRef.current, orbitTarget);
+
+  // Record flow hook
+  const {
+    flowState,
+    progress: recordProgress,
+    elapsedMs: recordElapsedMs,
+    error: recordError,
+    result: recordResult,
+    isSupported: isRecordingSupported,
+    startRecording,
+    stopRecording,
+    reset: resetRecording,
+  } = useRecordFlow(
+    viewerRef.current,
+    cesiumRef.current,
+    orbitTarget,
+    orbitConfig,
+    fileId
+  );
 
   const handleSelectEntity = useCallback((entityId: string) => {
     const Cesium = cesiumRef.current;
@@ -348,7 +368,22 @@ export function KmlPreviewViewer({ fileId, fileName }: Props) {
               onPreview={startPreview}
               onStop={stopOrbit}
               onReset={resetConfig}
-              disabled={!orbitTarget}
+              disabled={!orbitTarget || flowState !== "idle"}
+            />
+
+            {/* Record Panel - Below Orbit Controls */}
+            <RecordPanel
+              flowState={flowState}
+              progress={recordProgress}
+              elapsedMs={recordElapsedMs}
+              durationMs={orbitConfig.durationSec * 1000}
+              error={recordError}
+              result={recordResult}
+              isSupported={isRecordingSupported}
+              onStart={startRecording}
+              onStop={stopRecording}
+              onReset={resetRecording}
+              disabled={!orbitTarget || orbitState.isRunning}
             />
           </div>
         </>

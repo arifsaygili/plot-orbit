@@ -21,6 +21,17 @@ enum PlanCode {
 enum FileType {
   KML
   KMZ
+  VIDEO_WEBM
+  VIDEO_MP4
+}
+
+enum VideoStatus {
+  CREATED
+  RECORDING
+  RECORDED
+  UPLOADING
+  READY
+  FAILED
 }
 
 model Plan {
@@ -46,6 +57,7 @@ model Tenant {
   tenantPlans TenantPlan[]
   usage       TenantUsage?
   files       File[]
+  videos      Video[]
 }
 
 model File {
@@ -63,6 +75,11 @@ model File {
 
   tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   createdBy User   @relation(fields: [createdByUserId], references: [id])
+
+  // Relation to Video as output file
+  videoOutput Video[] @relation("VideoOutputFile")
+  // Relation to Video as source KML
+  videoSource Video[] @relation("VideoSourceKml")
 
   @@index([tenantId])
   @@index([tenantId, createdAt])
@@ -106,6 +123,7 @@ model User {
   tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   sessions Session[]
   files    File[]
+  videos   Video[]
 
   @@index([tenantId])
 }
@@ -132,4 +150,36 @@ model AppConfig {
   value     String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Video {
+  id              String      @id @default(cuid())
+  tenantId        String
+  createdByUserId String
+  status          VideoStatus @default(CREATED)
+  errorMessage    String?
+
+  // Source KML file (optional, for tracking)
+  sourceKmlFileId String?
+
+  // Output video file (set after upload)
+  outputFileId String?
+
+  // Recording metadata
+  durationMs   Int?
+  fps          Int?
+  width        Int?
+  height       Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy   User   @relation(fields: [createdByUserId], references: [id])
+  sourceKml   File?  @relation("VideoSourceKml", fields: [sourceKmlFileId], references: [id])
+  outputFile  File?  @relation("VideoOutputFile", fields: [outputFileId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([createdByUserId])
 }

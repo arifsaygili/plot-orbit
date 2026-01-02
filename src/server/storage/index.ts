@@ -5,3 +5,10 @@ export { LocalStorageProvider, localStorageProvider } from "./localStorageProvid
 // In production, this can be swapped with S3StorageProvider
 import { localStorageProvider } from "./localStorageProvider";
 export const storageProvider = localStorageProvider;
+
+/**
+ * Get the configured storage provider
+ */
+export function getStorageProvider() {
+  return storageProvider;
+}
