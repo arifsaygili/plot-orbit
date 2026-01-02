@@ -1,4 +1,4 @@
-import type { Viewer, Entity } from "cesium";
+import type { Viewer } from "cesium";
 import type { OrbitConfig, OrbitTarget, OrbitState, OrbitFrame } from "./types";
 import { DEFAULT_ORBIT_CONFIG, DEFAULT_SAFETY_LIMITS } from "./types";
 import {
@@ -35,6 +35,7 @@ export class OrbitController {
   private startTime: number = 0;
   private originalCameraTransform: import("cesium").Matrix4 | null = null;
   private stateChangeCallback: ((state: OrbitState) => void) | null = null;
+  private terrainHeight: number = 0; // Cached terrain height at target
 
   /**
    * Initialize the controller with Cesium viewer
@@ -91,8 +92,8 @@ export class OrbitController {
       fullConfig.headingEndDeg = fullConfig.headingStartDeg + 120; // 120° arc
     }
 
-    // Get terrain height at target
-    const terrainHeight = await getTerrainHeightAtTarget(
+    // Get terrain height at target and cache it
+    this.terrainHeight = await getTerrainHeightAtTarget(
       this.viewer,
       target,
       this.Cesium
@@ -109,7 +110,7 @@ export class OrbitController {
     const safeRadius = calculateSafeRadius(
       safetyResult.config.radiusMeters,
       safetyResult.config.pitchDeg,
-      terrainHeight
+      this.terrainHeight
     );
 
     if (safeRadius > safetyResult.config.radiusMeters) {
@@ -250,11 +251,18 @@ export class OrbitController {
     const headingRad = degToRad(headingDeg);
     const pitchRad = degToRad(this.config.pitchDeg);
 
-    // Create target position
+    // Calculate effective height: use terrain height if it's higher than entity height
+    // This ensures the orbit center is at ground level, not below it
+    const effectiveHeight = Math.max(
+      this.target.height,
+      this.terrainHeight
+    ) + this.config.heightOffsetMeters;
+
+    // Create target position at the effective height
     const targetPosition = Cesium.Cartesian3.fromDegrees(
       this.target.longitude,
       this.target.latitude,
-      this.target.height + this.config.heightOffsetMeters
+      effectiveHeight
     );
 
     // Create transform centered on target

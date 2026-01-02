@@ -3,6 +3,10 @@
 import { useMemo } from "react";
 import type { RecordFlowState, RecordFlowResult } from "./useRecordFlow";
 import { downloadRecording } from "@/client/recording";
+import {
+  OUTPUT_PRESETS,
+  type OutputPresetType,
+} from "./outputPresets";
 
 interface Props {
   flowState: RecordFlowState;
@@ -12,6 +16,8 @@ interface Props {
   error: string | null;
   result: RecordFlowResult | null;
   isSupported: boolean;
+  outputPreset: OutputPresetType;
+  onOutputPresetChange: (preset: OutputPresetType) => void;
   onStart: () => void;
   onStop: () => void;
   onReset: () => void;
@@ -26,6 +32,8 @@ export function RecordPanel({
   error,
   result,
   isSupported,
+  outputPreset,
+  onOutputPresetChange,
   onStart,
   onStop,
   onReset,
@@ -104,6 +112,28 @@ export function RecordPanel({
       {isError && error && (
         <div className="bg-red-900/40 border border-red-600/50 rounded px-3 py-2 text-sm text-red-300 mb-4">
           {error}
+        </div>
+      )}
+
+      {/* Output Preset selector */}
+      {isIdle && (
+        <div className="mb-4">
+          <label className="block text-xs text-gray-400 mb-1">Output Format</label>
+          <select
+            value={outputPreset}
+            onChange={(e) => onOutputPresetChange(e.target.value as OutputPresetType)}
+            disabled={disabled}
+            className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+          >
+            {OUTPUT_PRESETS.map((preset) => (
+              <option key={preset.id} value={preset.id}>
+                {preset.name}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-gray-500 mt-1">
+            {OUTPUT_PRESETS.find((p) => p.id === outputPreset)?.description}
+          </p>
         </div>
       )}
 

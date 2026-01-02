@@ -112,3 +112,63 @@ export async function uploadVideo(
 export function getVideoDownloadUrl(videoId: string): string {
   return `/api/videos/${videoId}/download`;
 }
+
+/**
+ * Get video stream URL (for player)
+ */
+export function getVideoStreamUrl(videoId: string): string {
+  return `/api/videos/${videoId}/stream`;
+}
+
+/**
+ * Video list item
+ */
+export interface VideoListItem {
+  id: string;
+  status: string;
+  durationMs: number | null;
+  fps: number | null;
+  width: number | null;
+  height: number | null;
+  createdAt: string;
+  output: {
+    fileId: string;
+    type: string;
+    mime: string;
+    size: number;
+  } | null;
+  sourceKml: {
+    id: string;
+    name: string;
+  } | null;
+}
+
+/**
+ * Video list response
+ */
+export interface VideoListResponse {
+  ok: boolean;
+  items: VideoListItem[];
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+/**
+ * List videos for the current tenant
+ */
+export async function listVideos(params?: {
+  status?: string;
+  page?: number;
+  limit?: number;
+}): Promise<VideoListResponse> {
+  const searchParams = new URLSearchParams();
+  if (params?.status) searchParams.set("status", params.status);
+  if (params?.page) searchParams.set("page", params.page.toString());
+  if (params?.limit) searchParams.set("limit", params.limit.toString());
+
+  const query = searchParams.toString();
+  const response = await fetch(`/api/videos${query ? `?${query}` : ""}`);
+  return response.json();
+}

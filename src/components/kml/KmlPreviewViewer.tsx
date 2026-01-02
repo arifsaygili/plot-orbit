@@ -30,7 +30,13 @@ import {
   type SceneSettings,
 } from "./SceneSettingsPanel";
 import { OrbitPanel, useOrbit } from "@/components/orbit";
-import { RecordPanel, useRecordFlow } from "@/components/record";
+import {
+  RecordPanel,
+  OverlayPanel,
+  ReelsWizard,
+  useRecordFlow,
+  getOutputPreset,
+} from "@/components/record";
 import type { Viewer as CesiumViewer, KmlDataSource, Entity } from "cesium";
 
 interface Props {
@@ -91,9 +97,13 @@ export function KmlPreviewViewer({ fileId, fileName }: Props) {
     error: recordError,
     result: recordResult,
     isSupported: isRecordingSupported,
+    outputPreset,
+    overlayConfig,
     startRecording,
     stopRecording,
     reset: resetRecording,
+    setOutputPreset,
+    setOverlayConfig,
   } = useRecordFlow(
     viewerRef.current,
     cesiumRef.current,
@@ -101,6 +111,10 @@ export function KmlPreviewViewer({ fileId, fileName }: Props) {
     orbitConfig,
     fileId
   );
+
+  // Get current preset info for aspect ratio
+  const currentPreset = getOutputPreset(outputPreset);
+  const isReelsMode = outputPreset === "REELS_9_16";
 
   const handleSelectEntity = useCallback((entityId: string) => {
     const Cesium = cesiumRef.current;
@@ -303,7 +317,7 @@ export function KmlPreviewViewer({ fileId, fileName }: Props) {
   }, [fileId]);
 
   return (
-    <div className="relative w-full h-full min-h-[500px]">
+    <div className="relative w-full h-full min-h-[500px] flex items-center justify-center bg-gray-950">
       {isLoading && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900 z-10">
           <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4" />
@@ -333,19 +347,48 @@ export function KmlPreviewViewer({ fileId, fileName }: Props) {
         </div>
       )}
 
-      <div ref={containerRef} className="w-full h-full" />
+      {/* Viewer container with aspect ratio based on preset */}
+      <div
+        ref={containerRef}
+        className={`relative ${
+          isReelsMode
+            ? "h-full max-h-full"
+            : "w-full h-full"
+        }`}
+        style={
+          isReelsMode
+            ? {
+                aspectRatio: currentPreset.aspectRatio,
+                maxWidth: "100%",
+              }
+            : undefined
+        }
+      />
 
       {/* Panels */}
       {!isLoading && !error && (
         <>
           {/* Target Selection Panel - Right */}
-          <div className="absolute top-4 right-4 z-20">
+          <div className="absolute top-4 right-4 z-20 space-y-4">
             <TargetSelector
               entities={entities}
               selectedEntityId={selectedEntityId}
               boundingInfo={boundingInfo}
               onSelectEntity={handleSelectEntity}
             />
+
+            {/* Reels Wizard - Quick access */}
+            {flowState === "idle" && (
+              <ReelsWizard
+                outputPreset={outputPreset}
+                overlayConfig={overlayConfig}
+                onPresetChange={setOutputPreset}
+                onOverlayChange={setOverlayConfig}
+                onGenerate={startRecording}
+                disabled={!orbitTarget || orbitState.isRunning}
+                isRecording={flowState !== "idle"}
+              />
+            )}
           </div>
 
           {/* Scene Settings Panel - Left */}
@@ -380,11 +423,22 @@ export function KmlPreviewViewer({ fileId, fileName }: Props) {
               error={recordError}
               result={recordResult}
               isSupported={isRecordingSupported}
+              outputPreset={outputPreset}
+              onOutputPresetChange={setOutputPreset}
               onStart={startRecording}
               onStop={stopRecording}
               onReset={resetRecording}
               disabled={!orbitTarget || orbitState.isRunning}
             />
+
+            {/* Overlay Panel - Only shown for Reels mode */}
+            {isReelsMode && flowState === "idle" && (
+              <OverlayPanel
+                config={overlayConfig}
+                onChange={setOverlayConfig}
+                disabled={!orbitTarget || orbitState.isRunning}
+              />
+            )}
           </div>
         </>
       )}

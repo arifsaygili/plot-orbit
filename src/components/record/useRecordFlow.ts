@@ -7,9 +7,12 @@ import { getOrbitController } from "@/lib/cesium/orbit";
 import {
   RecordingEngine,
   getRecordingEngine,
+  getCompositeRecorder,
   type RecordingResult,
   type RecordingQuality,
+  type OverlayConfig,
   QUALITY_PRESETS,
+  DEFAULT_REELS_OVERLAY,
 } from "@/client/recording";
 import {
   createVideoIntent,
@@ -17,6 +20,11 @@ import {
   uploadVideo,
 } from "@/client/api/videosClient";
 import { getFileExtension } from "@/client/recording";
+import {
+  type OutputPresetType,
+  getOutputPreset,
+  DEFAULT_OUTPUT_PRESET,
+} from "./outputPresets";
 
 /**
  * Recording flow state
@@ -60,11 +68,16 @@ export interface UseRecordFlowReturn {
   error: string | null;
   result: RecordFlowResult | null;
   isSupported: boolean;
+  outputPreset: OutputPresetType;
+  overlayConfig: OverlayConfig;
 
   // Actions
   startRecording: () => Promise<void>;
   stopRecording: () => void;
   reset: () => void;
+  setOutputPreset: (preset: OutputPresetType) => void;
+  setOverlayConfig: (config: OverlayConfig) => void;
+  updateOverlayText: (position: "top" | "bottom", text: string) => void;
 }
 
 const DEFAULT_CONFIG: RecordFlowConfig = {
@@ -88,11 +101,14 @@ export function useRecordFlow(
   const [elapsedMs, setElapsedMs] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<RecordFlowResult | null>(null);
+  const [outputPreset, setOutputPreset] = useState<OutputPresetType>(DEFAULT_OUTPUT_PRESET);
+  const [overlayConfig, setOverlayConfig] = useState<OverlayConfig>(DEFAULT_REELS_OVERLAY);
 
   const videoIdRef = useRef<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number>(0);
   const durationMsRef = useRef<number>(0);
+  const useCompositeRef = useRef<boolean>(false);
 
   // Check browser support
   const isSupported = RecordingEngine.isSupported();
@@ -156,13 +172,32 @@ export function useRecordFlow(
       }
 
       // Step 5: Start recording
-      const recordingEngine = getRecordingEngine();
-      const bitsPerSecond = QUALITY_PRESETS[DEFAULT_CONFIG.quality].bitsPerSecond;
+      const preset = getOutputPreset(outputPreset);
+      // Use preset bitrate if available, otherwise fall back to quality preset
+      const bitsPerSecond = preset.defaultBitrate || QUALITY_PRESETS[DEFAULT_CONFIG.quality].bitsPerSecond;
 
-      recordingEngine.startRecording(canvas, {
-        fps: orbitConfig.fps,
-        bitsPerSecond,
-      });
+      // Determine if we need composite recording (Reels with overlay text)
+      const hasOverlayText =
+        outputPreset === "REELS_9_16" &&
+        (overlayConfig.topText?.text?.trim() || overlayConfig.bottomText?.text?.trim());
+
+      useCompositeRef.current = !!hasOverlayText;
+
+      if (hasOverlayText) {
+        // Use composite recorder for overlay burn-in
+        const compositeRecorder = getCompositeRecorder();
+        compositeRecorder.startRecording(canvas, overlayConfig, {
+          fps: orbitConfig.fps,
+          bitsPerSecond,
+        });
+      } else {
+        // Use standard recording engine
+        const recordingEngine = getRecordingEngine();
+        recordingEngine.startRecording(canvas, {
+          fps: orbitConfig.fps,
+          bitsPerSecond,
+        });
+      }
 
       // Update state
       setFlowState("recording");
@@ -193,7 +228,7 @@ export function useRecordFlow(
         });
       }
     }
-  }, [viewer, Cesium, target, orbitConfig, sourceKmlFileId, isSupported]);
+  }, [viewer, Cesium, target, orbitConfig, sourceKmlFileId, isSupported, outputPreset, overlayConfig]);
 
   // Handle recording complete (called by timer or manual stop)
   const handleRecordingComplete = useCallback(async () => {
@@ -209,9 +244,15 @@ export function useRecordFlow(
       const orbitController = getOrbitController();
       orbitController.stopOrbit();
 
-      // Stop recording
-      const recordingEngine = getRecordingEngine();
-      const recordingResult: RecordingResult = await recordingEngine.stopRecording();
+      // Stop recording (use correct recorder based on mode)
+      let recordingResult: RecordingResult;
+      if (useCompositeRef.current) {
+        const compositeRecorder = getCompositeRecorder();
+        recordingResult = await compositeRecorder.stopRecording();
+      } else {
+        const recordingEngine = getRecordingEngine();
+        recordingResult = await recordingEngine.stopRecording();
+      }
 
       // Re-enable request render mode
       if (viewer) {
@@ -279,10 +320,15 @@ export function useRecordFlow(
       timerRef.current = null;
     }
 
-    // Cleanup recording engine
+    // Cleanup recording engines
     const recordingEngine = getRecordingEngine();
     if (recordingEngine.getIsRecording()) {
       recordingEngine.abort();
+    }
+
+    const compositeRecorder = getCompositeRecorder();
+    if (compositeRecorder.getIsRecording()) {
+      compositeRecorder.abort();
     }
 
     // Stop orbit
@@ -302,7 +348,28 @@ export function useRecordFlow(
     setError(null);
     setResult(null);
     videoIdRef.current = null;
+    useCompositeRef.current = false;
   }, [result]);
+
+  // Helper to update overlay text
+  const updateOverlayText = useCallback(
+    (position: "top" | "bottom", text: string) => {
+      setOverlayConfig((prev) => {
+        if (position === "top") {
+          return {
+            ...prev,
+            topText: prev.topText ? { ...prev.topText, text } : undefined,
+          };
+        } else {
+          return {
+            ...prev,
+            bottomText: prev.bottomText ? { ...prev.bottomText, text } : undefined,
+          };
+        }
+      });
+    },
+    []
+  );
 
   return {
     flowState,
@@ -311,8 +378,13 @@ export function useRecordFlow(
     error,
     result,
     isSupported,
+    outputPreset,
+    overlayConfig,
     startRecording,
     stopRecording,
     reset,
+    setOutputPreset,
+    setOverlayConfig,
+    updateOverlayText,
   };
 }

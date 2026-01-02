@@ -32,6 +32,12 @@ export default async function DashboardLayout({
                 >
                   KML Files
                 </Link>
+                <Link
+                  href="/videos"
+                  className="text-gray-600 hover:text-gray-900 text-sm font-medium"
+                >
+                  Videos
+                </Link>
               </div>
             </div>
             <div className="flex items-center gap-4">
