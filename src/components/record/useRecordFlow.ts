@@ -94,7 +94,7 @@ export function useRecordFlow(
   Cesium: typeof import("cesium") | null,
   target: OrbitTarget | null,
   orbitConfig: OrbitConfig,
-  sourceKmlFileId?: string
+  listingId?: string
 ): UseRecordFlowReturn {
   const [flowState, setFlowState] = useState<RecordFlowState>("idle");
   const [progress, setProgress] = useState(0);
@@ -143,7 +143,7 @@ export function useRecordFlow(
       setResult(null);
 
       // Step 1: Create video intent
-      const intentResult = await createVideoIntent(sourceKmlFileId);
+      const intentResult = await createVideoIntent(listingId);
       if (!intentResult.ok || !intentResult.videoId) {
         throw new Error(intentResult.message || "Failed to create video");
       }
@@ -228,7 +228,7 @@ export function useRecordFlow(
         });
       }
     }
-  }, [viewer, Cesium, target, orbitConfig, sourceKmlFileId, isSupported, outputPreset, overlayConfig]);
+  }, [viewer, Cesium, target, orbitConfig, listingId, isSupported, outputPreset, overlayConfig]);
 
   // Handle recording complete (called by timer or manual stop)
   const handleRecordingComplete = useCallback(async () => {

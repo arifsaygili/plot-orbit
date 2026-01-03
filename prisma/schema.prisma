@@ -19,8 +19,6 @@ enum PlanCode {
 }
 
 enum FileType {
-  KML
-  KMZ
   VIDEO_WEBM
   VIDEO_MP4
 }
@@ -58,6 +56,7 @@ model Tenant {
   usage       TenantUsage?
   files       File[]
   videos      Video[]
+  listings    Listing[]
 }
 
 model File {
@@ -78,8 +77,6 @@ model File {
 
   // Relation to Video as output file
   videoOutput Video[] @relation("VideoOutputFile")
-  // Relation to Video as source KML
-  videoSource Video[] @relation("VideoSourceKml")
 
   @@index([tenantId])
   @@index([tenantId, createdAt])
@@ -124,6 +121,7 @@ model User {
   sessions Session[]
   files    File[]
   videos   Video[]
+  listings Listing[]
 
   @@index([tenantId])
 }
@@ -159,8 +157,8 @@ model Video {
   status          VideoStatus @default(CREATED)
   errorMessage    String?
 
-  // Source KML file (optional, for tracking)
-  sourceKmlFileId String?
+  // Source listing
+  listingId String?
 
   // Output video file (set after upload)
   outputFileId String?
@@ -174,12 +172,45 @@ model Video {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  createdBy   User   @relation(fields: [createdByUserId], references: [id])
-  sourceKml   File?  @relation("VideoSourceKml", fields: [sourceKmlFileId], references: [id])
-  outputFile  File?  @relation("VideoOutputFile", fields: [outputFileId], references: [id])
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy  User     @relation(fields: [createdByUserId], references: [id])
+  listing    Listing? @relation(fields: [listingId], references: [id], onDelete: SetNull)
+  outputFile File?    @relation("VideoOutputFile", fields: [outputFileId], references: [id])
 
   @@index([tenantId])
   @@index([tenantId, status])
+  @@index([createdByUserId])
+  @@index([listingId])
+}
+
+model Listing {
+  id              String  @id @default(cuid())
+  tenantId        String
+  createdByUserId String
+  title           String
+  description     String?
+
+  // Parcel information from TKGM
+  parcelInfo Json // { il, ilce, mahalle, ada, parsel, mahalleId }
+
+  // Geometry data (GeoJSON FeatureCollection)
+  geometry Json
+
+  // Computed from geometry for quick access
+  centroid Json // { lat, lng }
+  bbox     Json // [west, south, east, north]
+
+  // AI-generated description (placeholder for future)
+  aiDescription String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant    Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy User    @relation(fields: [createdByUserId], references: [id])
+  videos    Video[]
+
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
   @@index([createdByUserId])
 }

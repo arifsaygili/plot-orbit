@@ -4,7 +4,7 @@ import { canCreateVideo, consumeVideoCredit } from "@/server/quota";
 import { prisma } from "@/lib/prisma";
 
 interface CreateIntentBody {
-  sourceKmlFileId?: string;
+  listingId?: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -16,26 +16,25 @@ export async function POST(request: NextRequest) {
   const userId = auth.user.id;
 
   // Parse optional body
-  let sourceKmlFileId: string | undefined;
+  let listingId: string | undefined;
   try {
     const body = (await request.json()) as CreateIntentBody;
-    sourceKmlFileId = body.sourceKmlFileId;
+    listingId = body.listingId;
   } catch {
     // Body is optional
   }
 
-  // Validate sourceKmlFileId belongs to tenant if provided
-  if (sourceKmlFileId) {
-    const kmlFile = await prisma.file.findFirst({
+  // Validate listingId belongs to tenant if provided
+  if (listingId) {
+    const listing = await prisma.listing.findFirst({
       where: {
-        id: sourceKmlFileId,
+        id: listingId,
         tenantId,
-        type: { in: ["KML", "KMZ"] },
       },
     });
-    if (!kmlFile) {
+    if (!listing) {
       return NextResponse.json(
-        { ok: false, code: "INVALID_KML_FILE", message: "KML file not found" },
+        { ok: false, code: "INVALID_LISTING", message: "Listing not found" },
         { status: 400 }
       );
     }
@@ -65,7 +64,7 @@ export async function POST(request: NextRequest) {
       tenantId,
       createdByUserId: userId,
       status: "CREATED",
-      sourceKmlFileId: sourceKmlFileId || null,
+      listingId: listingId || null,
     },
   });
 

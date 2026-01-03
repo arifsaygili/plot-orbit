@@ -43,9 +43,9 @@ export interface UploadResponse {
  * Create a video intent (reserves quota and creates Video record)
  */
 export async function createVideoIntent(
-  sourceKmlFileId?: string
+  listingId?: string
 ): Promise<CreateIntentResponse> {
-  const body = sourceKmlFileId ? JSON.stringify({ sourceKmlFileId }) : undefined;
+  const body = listingId ? JSON.stringify({ listingId }) : undefined;
 
   const response = await fetch("/api/videos/create-intent", {
     method: "POST",

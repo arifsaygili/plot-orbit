@@ -23,7 +23,6 @@ import { useDisclosure } from "@mantine/hooks";
 import {
   IconVideo,
   IconLayoutDashboard,
-  IconFiles,
   IconMovie,
   IconBrandInstagram,
   IconSettings,
@@ -31,6 +30,7 @@ import {
   IconChevronDown,
   IconLogout,
   IconUser,
+  IconMapPin,
 } from "@tabler/icons-react";
 import { getMe, type CurrentUser } from "@/client/api/meClient";
 
@@ -43,7 +43,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: IconLayoutDashboard },
-  { label: "KML'ler", href: "/kml", icon: IconFiles },
+  { label: "İlanlarım", href: "/listings", icon: IconMapPin },
   { label: "Videolar", href: "/videos", icon: IconMovie },
   { label: "Reels", href: "/reels", icon: IconBrandInstagram, disabled: true },
   { label: "Ayarlar", href: "/settings", icon: IconSettings, disabled: true },
