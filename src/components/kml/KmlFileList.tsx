@@ -1,6 +1,24 @@
 "use client";
 
 import Link from "next/link";
+import {
+  Table,
+  Text,
+  Badge,
+  Button,
+  Group,
+  Stack,
+  Skeleton,
+  Box,
+  ActionIcon,
+  Tooltip,
+} from "@mantine/core";
+import {
+  IconEye,
+  IconFiles,
+  IconTrash,
+  IconDownload,
+} from "@tabler/icons-react";
 import type { FileInfo } from "@/client/api/filesClient";
 
 interface Props {
@@ -24,87 +42,145 @@ function formatDate(dateStr: string): string {
   });
 }
 
+function LoadingSkeleton() {
+  return (
+    <Stack gap="sm">
+      {[1, 2, 3].map((i) => (
+        <Group key={i} gap="sm" p="sm">
+          <Skeleton height={20} width="30%" />
+          <Skeleton height={20} width="15%" />
+          <Skeleton height={20} width="15%" />
+          <Skeleton height={20} width="20%" />
+          <Skeleton height={32} width="80px" />
+        </Group>
+      ))}
+    </Stack>
+  );
+}
+
+function EmptyState() {
+  return (
+    <Box py="xl" ta="center">
+      <Box
+        style={{
+          width: 64,
+          height: 64,
+          borderRadius: "50%",
+          background: "var(--mantine-color-gray-1)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          margin: "0 auto",
+          marginBottom: 16,
+        }}
+      >
+        <IconFiles size={28} color="var(--mantine-color-gray-5)" />
+      </Box>
+      <Text fz="md" fw={500} c="dark.6" mb={4}>
+        Henüz dosya yok
+      </Text>
+      <Text fz="sm" c="dimmed">
+        İlk KML dosyanı yukarıdan yükleyerek başla
+      </Text>
+    </Box>
+  );
+}
+
+function FileRow({ file }: { file: FileInfo }) {
+  return (
+    <Table.Tr>
+      <Table.Td>
+        <div>
+          <Text fz="sm" fw={500} c="dark.7">
+            {file.name}
+          </Text>
+          {file.name !== file.originalName && (
+            <Text fz="xs" c="dimmed">
+              {file.originalName}
+            </Text>
+          )}
+        </div>
+      </Table.Td>
+      <Table.Td>
+        <Badge
+          size="sm"
+          variant="light"
+          color={file.type === "KMZ" ? "violet" : "teal"}
+        >
+          {file.type}
+        </Badge>
+      </Table.Td>
+      <Table.Td>
+        <Text fz="sm" c="dark.5">
+          {formatFileSize(file.size)}
+        </Text>
+      </Table.Td>
+      <Table.Td>
+        <Text fz="sm" c="dark.5">
+          {formatDate(file.createdAt)}
+        </Text>
+      </Table.Td>
+      <Table.Td>
+        <Group gap="xs" justify="flex-end">
+          <Button
+            size="xs"
+            variant="filled"
+            color="teal"
+            leftSection={<IconEye size={14} />}
+            component={Link}
+            href={`/kml/preview/${file.id}`}
+          >
+            Önizle
+          </Button>
+        </Group>
+      </Table.Td>
+    </Table.Tr>
+  );
+}
+
 export function KmlFileList({ files, isLoading }: Props) {
   if (isLoading) {
-    return (
-      <div className="flex justify-center py-8">
-        <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+    return <LoadingSkeleton />;
   }
 
   if (files.length === 0) {
-    return (
-      <div className="text-center py-8 text-gray-500">
-        No KML files uploaded yet
-      </div>
-    );
+    return <EmptyState />;
   }
 
   return (
-    <div className="overflow-hidden rounded-lg border border-gray-200">
-      <table className="min-w-full divide-y divide-gray-200">
-        <thead className="bg-gray-50">
-          <tr>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Name
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Type
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Size
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Uploaded
-            </th>
-            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Actions
-            </th>
-          </tr>
-        </thead>
-        <tbody className="bg-white divide-y divide-gray-200">
+    <Table.ScrollContainer minWidth={600}>
+      <Table
+        highlightOnHover
+        horizontalSpacing="md"
+        verticalSpacing="sm"
+        styles={{
+          th: {
+            color: "var(--mantine-color-dark-4)",
+            fontWeight: 600,
+            fontSize: 12,
+            textTransform: "uppercase",
+            letterSpacing: 0.5,
+          },
+          tr: {
+            transition: "background 0.15s ease",
+          },
+        }}
+      >
+        <Table.Thead>
+          <Table.Tr>
+            <Table.Th>Dosya Adı</Table.Th>
+            <Table.Th>Tür</Table.Th>
+            <Table.Th>Boyut</Table.Th>
+            <Table.Th>Yüklenme Tarihi</Table.Th>
+            <Table.Th ta="right">İşlemler</Table.Th>
+          </Table.Tr>
+        </Table.Thead>
+        <Table.Tbody>
           {files.map((file) => (
-            <tr key={file.id} className="hover:bg-gray-50">
-              <td className="px-4 py-3">
-                <div className="text-sm font-medium text-gray-900">
-                  {file.name}
-                </div>
-                {file.name !== file.originalName && (
-                  <div className="text-xs text-gray-500">
-                    {file.originalName}
-                  </div>
-                )}
-              </td>
-              <td className="px-4 py-3">
-                <span
-                  className={`inline-flex px-2 py-1 text-xs font-semibold rounded ${
-                    file.type === "KMZ"
-                      ? "bg-purple-100 text-purple-800"
-                      : "bg-green-100 text-green-800"
-                  }`}
-                >
-                  {file.type}
-                </span>
-              </td>
-              <td className="px-4 py-3 text-sm text-gray-500">
-                {formatFileSize(file.size)}
-              </td>
-              <td className="px-4 py-3 text-sm text-gray-500">
-                {formatDate(file.createdAt)}
-              </td>
-              <td className="px-4 py-3 text-right">
-                <Link
-                  href={`/kml/preview/${file.id}`}
-                  className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700 transition-colors"
-                >
-                  Preview
-                </Link>
-              </td>
-            </tr>
+            <FileRow key={file.id} file={file} />
           ))}
-        </tbody>
-      </table>
-    </div>
+        </Table.Tbody>
+      </Table>
+    </Table.ScrollContainer>
   );
 }

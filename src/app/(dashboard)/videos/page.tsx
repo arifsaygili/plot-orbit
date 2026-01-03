@@ -1,16 +1,34 @@
+"use client";
+
+import {
+  Container,
+  Stack,
+  Title,
+  Text,
+  Group,
+} from "@mantine/core";
+import { IconMovie } from "@tabler/icons-react";
 import { VideoList } from "@/components/videos";
 
 export default function VideosPage() {
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Video Gallery</h1>
-        <p className="text-gray-600 mt-1">
-          Manage and download your recorded videos
-        </p>
-      </div>
+    <Container size="lg" py="xl">
+      <Stack gap="lg">
+        {/* Page Header */}
+        <div>
+          <Group gap="sm" mb={4}>
+            <IconMovie size={28} color="var(--mantine-color-teal-6)" />
+            <Title order={2} c="dark.7">
+              Videolar
+            </Title>
+          </Group>
+          <Text fz="md" c="dark.4">
+            Kaydettiğin videoları yönet ve indir
+          </Text>
+        </div>
 
-      <VideoList />
-    </div>
+        <VideoList />
+      </Stack>
+    </Container>
   );
 }

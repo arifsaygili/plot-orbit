@@ -131,13 +131,13 @@ export function QuickStartStepper({ steps = defaultSteps }: QuickStartStepperPro
           <Text fz="lg" fw={600} c="dark.7">
             Hızlı Başlangıç
           </Text>
-          <Text fz="sm" c="dimmed">
+          <Text fz="sm" c="dark.4">
             5 adımda profesyonel emlak videosu oluştur
           </Text>
         </div>
         <Group gap="xs">
-          <IconClock size={14} color="var(--mantine-color-dimmed)" />
-          <Text fz="xs" c="dimmed">
+          <IconClock size={14} color="var(--mantine-color-gray-6)" />
+          <Text fz="xs" c="dark.3">
             Bu akış 60–90 sn sürer
           </Text>
         </Group>
@@ -173,13 +173,13 @@ export function QuickStartStepper({ steps = defaultSteps }: QuickStartStepperPro
               completedIcon={<Icon size={18} />}
               label={
                 <Group gap="sm">
-                  <Text fw={500}>{step.title}</Text>
+                  <Text fw={600} c="dark.7">{step.title}</Text>
                   {getStatusBadge(step.status)}
                 </Group>
               }
               description={
                 <Stack gap="sm" mt="xs">
-                  <Text fz="sm" c="dimmed">
+                  <Text fz="sm" c="dark.4">
                     {step.description}
                   </Text>
                   {isLocked ? (

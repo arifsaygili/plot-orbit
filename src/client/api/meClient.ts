@@ -9,7 +9,7 @@ export interface CurrentUser {
   email: string;
   name?: string | null;
   role: string;
-  tenant: {
+  tenant?: {
     id: string;
     name: string;
     slug: string;

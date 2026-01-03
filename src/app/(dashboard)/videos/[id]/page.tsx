@@ -1,3 +1,4 @@
+import { Container } from "@mantine/core";
 import { VideoDetail } from "@/components/videos";
 
 interface Props {
@@ -8,8 +9,8 @@ export default async function VideoDetailPage({ params }: Props) {
   const { id } = await params;
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <Container size="lg" py="xl">
       <VideoDetail videoId={id} />
-    </div>
+    </Container>
   );
 }

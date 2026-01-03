@@ -93,11 +93,13 @@ function UserMenu({ user, isLoading }: { user: CurrentUser | null; isLoading: bo
         {user && (
           <>
             <Menu.Label>{user.email}</Menu.Label>
-            <Menu.Label>
-              <Text fz="xs" c="dimmed">
-                {user.tenant.name}
-              </Text>
-            </Menu.Label>
+            {user.tenant && (
+              <Menu.Label>
+                <Text fz="xs" c="dimmed">
+                  {user.tenant.name}
+                </Text>
+              </Menu.Label>
+            )}
             <Menu.Divider />
           </>
         )}
@@ -207,12 +209,15 @@ export function DashboardShell({ children }: DashboardShellProps) {
                 <Tooltip key={item.href} label="Yakında" position="right">
                   <NavLink
                     label={item.label}
-                    leftSection={<Icon size={18} />}
+                    leftSection={<Icon size={18} color="var(--mantine-color-gray-5)" />}
                     disabled
                     styles={{
                       root: {
                         borderRadius: "var(--mantine-radius-md)",
-                        opacity: 0.5,
+                      },
+                      label: {
+                        color: "var(--mantine-color-gray-5)",
+                        fontWeight: 500,
                       },
                     }}
                   />
@@ -232,6 +237,10 @@ export function DashboardShell({ children }: DashboardShellProps) {
                 styles={{
                   root: {
                     borderRadius: "var(--mantine-radius-md)",
+                  },
+                  label: {
+                    color: isActive ? undefined : "var(--mantine-color-dark-6)",
+                    fontWeight: 500,
                   },
                 }}
                 color="teal"

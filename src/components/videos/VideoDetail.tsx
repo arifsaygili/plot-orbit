@@ -3,50 +3,78 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
+  Paper,
+  Text,
+  Group,
+  Stack,
+  Badge,
+  Button,
+  Box,
+  Skeleton,
+  Alert,
+  Anchor,
+  SimpleGrid,
+  Loader,
+} from "@mantine/core";
+import {
+  IconArrowLeft,
+  IconDownload,
+  IconAlertCircle,
+  IconCheck,
+  IconLoader,
+  IconX,
+} from "@tabler/icons-react";
+import {
   getVideo,
   getVideoDownloadUrl,
   getVideoStreamUrl,
   type VideoStatusResponse,
 } from "@/client/api/videosClient";
 
-const STATUS_INFO: Record<
+const STATUS_CONFIG: Record<
   string,
-  { label: string; color: string; message: string }
+  { label: string; color: string; message: string; icon: React.ElementType }
 > = {
   CREATED: {
-    label: "Created",
+    label: "Oluşturuldu",
     color: "gray",
-    message: "Video record created, waiting for recording to start.",
+    message: "Video kaydı oluşturuldu, kayıt başlaması bekleniyor.",
+    icon: IconLoader,
   },
   RECORDING: {
-    label: "Recording",
+    label: "Kaydediliyor",
     color: "yellow",
-    message: "Recording in progress...",
+    message: "Kayıt devam ediyor...",
+    icon: IconLoader,
   },
   RECORDED: {
-    label: "Recorded",
+    label: "Kaydedildi",
     color: "blue",
-    message: "Recording complete, preparing for upload...",
+    message: "Kayıt tamamlandı, yükleme için hazırlanıyor...",
+    icon: IconLoader,
   },
   UPLOADING: {
-    label: "Uploading",
+    label: "Yükleniyor",
     color: "blue",
-    message: "Uploading video to server...",
+    message: "Video sunucuya yükleniyor...",
+    icon: IconLoader,
   },
   READY: {
-    label: "Ready",
+    label: "Hazır",
     color: "green",
-    message: "Video is ready to view and download.",
+    message: "Video izlenmeye ve indirilmeye hazır.",
+    icon: IconCheck,
   },
   FAILED: {
-    label: "Failed",
+    label: "Başarısız",
     color: "red",
-    message: "An error occurred during video processing.",
+    message: "Video işlenirken bir hata oluştu.",
+    icon: IconX,
   },
 };
 
 function formatDuration(ms: number | null): string {
-  if (!ms) return "Unknown";
+  if (!ms) return "Bilinmiyor";
   const seconds = Math.floor(ms / 1000);
   const minutes = Math.floor(seconds / 60);
   const secs = seconds % 60;
@@ -70,6 +98,16 @@ function formatDate(dateStr: string): string {
   });
 }
 
+function LoadingSkeleton() {
+  return (
+    <Stack gap="lg">
+      <Skeleton height={24} width={120} />
+      <Skeleton height={400} radius="lg" />
+      <Skeleton height={200} radius="lg" />
+    </Stack>
+  );
+}
+
 interface Props {
   videoId: string;
 }
@@ -88,10 +126,10 @@ export function VideoDetail({ videoId }: Props) {
         if (result.ok && result.video) {
           setVideo(result.video);
         } else {
-          setError(result.message || "Video not found");
+          setError(result.message || "Video bulunamadı");
         }
       } catch {
-        setError("Failed to load video");
+        setError("Video yüklenemedi");
       } finally {
         setIsLoading(false);
       }
@@ -100,170 +138,194 @@ export function VideoDetail({ videoId }: Props) {
   }, [videoId]);
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+    return <LoadingSkeleton />;
   }
 
   if (error || !video) {
     return (
-      <div className="text-center py-12">
-        <div className="text-red-500 text-lg mb-4">{error || "Video not found"}</div>
-        <Link
-          href="/videos"
-          className="text-blue-600 hover:underline"
+      <Stack gap="lg" align="center" py="xl">
+        <Alert
+          icon={<IconAlertCircle size={16} />}
+          color="red"
+          variant="light"
+          radius="lg"
         >
-          Back to Videos
-        </Link>
-      </div>
+          {error || "Video bulunamadı"}
+        </Alert>
+        <Anchor component={Link} href="/videos" c="teal">
+          Videolara Dön
+        </Anchor>
+      </Stack>
     );
   }
 
-  const statusInfo = STATUS_INFO[video.status] || STATUS_INFO.CREATED;
+  const statusConfig = STATUS_CONFIG[video.status] || STATUS_CONFIG.CREATED;
   const isReady = video.status === "READY";
+  const isProcessing = video.status === "RECORDING" || video.status === "UPLOADING";
+  const StatusIcon = statusConfig.icon;
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <Stack gap="lg">
       {/* Back link */}
-      <Link
+      <Anchor
+        component={Link}
         href="/videos"
-        className="inline-flex items-center text-gray-600 hover:text-gray-900 mb-6"
+        c="dark.5"
+        size="sm"
+        style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
       >
-        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-        </svg>
-        Back to Videos
-      </Link>
+        <IconArrowLeft size={16} />
+        Videolara Dön
+      </Anchor>
 
       {/* Video Player or Status */}
-      <div className="bg-black rounded-lg overflow-hidden mb-6">
+      <Paper
+        shadow="sm"
+        radius="lg"
+        style={{ overflow: "hidden", background: "black" }}
+      >
         {isReady ? (
           <video
             src={getVideoStreamUrl(videoId)}
             controls
-            className="w-full aspect-video"
-            poster=""
+            style={{ width: "100%", aspectRatio: "16/9", display: "block" }}
           />
         ) : (
-          <div className="aspect-video flex flex-col items-center justify-center text-white">
-            {video.status === "RECORDING" || video.status === "UPLOADING" ? (
-              <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin mb-4" />
+          <Box
+            style={{
+              aspectRatio: "16/9",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "white",
+            }}
+          >
+            {isProcessing ? (
+              <Loader size="lg" color="white" mb="md" />
             ) : (
-              <svg
-                className="w-16 h-16 mb-4 text-gray-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+              <Box
+                mb="md"
+                style={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: "50%",
+                  background:
+                    video.status === "FAILED"
+                      ? "var(--mantine-color-red-6)"
+                      : "var(--mantine-color-gray-7)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                />
-              </svg>
+                <StatusIcon size={32} color="white" />
+              </Box>
             )}
-            <p className="text-lg">{statusInfo.message}</p>
-          </div>
+            <Text fz="lg" c="white">
+              {statusConfig.message}
+            </Text>
+          </Box>
         )}
-      </div>
+      </Paper>
 
       {/* Info Card */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <span
-              className={`inline-block px-3 py-1 rounded-full text-sm font-medium text-white bg-${statusInfo.color}-500`}
-              style={{
-                backgroundColor:
-                  statusInfo.color === "green"
-                    ? "#22c55e"
-                    : statusInfo.color === "red"
-                    ? "#ef4444"
-                    : statusInfo.color === "blue"
-                    ? "#3b82f6"
-                    : statusInfo.color === "yellow"
-                    ? "#eab308"
-                    : "#6b7280",
-              }}
-            >
-              {statusInfo.label}
-            </span>
-          </div>
+      <Paper shadow="sm" radius="lg" p="xl" withBorder>
+        <Group justify="space-between" mb="lg">
+          <Badge
+            size="lg"
+            variant={isProcessing ? "filled" : "light"}
+            color={statusConfig.color}
+            leftSection={<StatusIcon size={14} />}
+          >
+            {statusConfig.label}
+          </Badge>
           {isReady && (
-            <a
+            <Button
+              component="a"
               href={getVideoDownloadUrl(videoId)}
               download
-              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              color="teal"
+              leftSection={<IconDownload size={16} />}
             >
-              <svg
-                className="w-4 h-4 mr-2"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                />
-              </svg>
-              Download
-            </a>
+              İndir
+            </Button>
           )}
-        </div>
+        </Group>
 
-        <dl className="grid grid-cols-2 gap-4 text-sm">
-          <div>
-            <dt className="text-gray-500">Created</dt>
-            <dd className="text-gray-900 font-medium">{formatDate(video.createdAt)}</dd>
-          </div>
-          <div>
-            <dt className="text-gray-500">Duration</dt>
-            <dd className="text-gray-900 font-medium">{formatDuration(video.durationMs)}</dd>
-          </div>
+        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+          <Box>
+            <Text fz="xs" c="dimmed" tt="uppercase" fw={600} mb={4}>
+              Oluşturulma Tarihi
+            </Text>
+            <Text fz="sm" c="dark.7" fw={500}>
+              {formatDate(video.createdAt)}
+            </Text>
+          </Box>
+          <Box>
+            <Text fz="xs" c="dimmed" tt="uppercase" fw={600} mb={4}>
+              Süre
+            </Text>
+            <Text fz="sm" c="dark.7" fw={500}>
+              {formatDuration(video.durationMs)}
+            </Text>
+          </Box>
           {video.width && video.height && (
-            <div>
-              <dt className="text-gray-500">Resolution</dt>
-              <dd className="text-gray-900 font-medium">
+            <Box>
+              <Text fz="xs" c="dimmed" tt="uppercase" fw={600} mb={4}>
+                Çözünürlük
+              </Text>
+              <Text fz="sm" c="dark.7" fw={500}>
                 {video.width} x {video.height}
-              </dd>
-            </div>
+              </Text>
+            </Box>
           )}
           {video.fps && (
-            <div>
-              <dt className="text-gray-500">Frame Rate</dt>
-              <dd className="text-gray-900 font-medium">{video.fps} FPS</dd>
-            </div>
+            <Box>
+              <Text fz="xs" c="dimmed" tt="uppercase" fw={600} mb={4}>
+                Kare Hızı
+              </Text>
+              <Text fz="sm" c="dark.7" fw={500}>
+                {video.fps} FPS
+              </Text>
+            </Box>
           )}
           {video.outputFile && (
             <>
-              <div>
-                <dt className="text-gray-500">Format</dt>
-                <dd className="text-gray-900 font-medium">
+              <Box>
+                <Text fz="xs" c="dimmed" tt="uppercase" fw={600} mb={4}>
+                  Format
+                </Text>
+                <Text fz="sm" c="dark.7" fw={500}>
                   {video.outputFile.mime.replace("video/", "").toUpperCase()}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-gray-500">File Size</dt>
-                <dd className="text-gray-900 font-medium">
+                </Text>
+              </Box>
+              <Box>
+                <Text fz="xs" c="dimmed" tt="uppercase" fw={600} mb={4}>
+                  Dosya Boyutu
+                </Text>
+                <Text fz="sm" c="dark.7" fw={500}>
                   {formatFileSize(video.outputFile.size)}
-                </dd>
-              </div>
+                </Text>
+              </Box>
             </>
           )}
-        </dl>
+        </SimpleGrid>
 
         {/* Error message for failed videos */}
-        {video.status === "FAILED" && (video as { errorMessage?: string }).errorMessage && (
-          <div className="mt-4 p-3 bg-red-50 text-red-700 rounded text-sm">
-            Error: {(video as { errorMessage?: string }).errorMessage}
-          </div>
-        )}
-      </div>
-    </div>
+        {video.status === "FAILED" &&
+          (video as { errorMessage?: string }).errorMessage && (
+            <Alert
+              icon={<IconAlertCircle size={16} />}
+              color="red"
+              variant="light"
+              radius="md"
+              mt="lg"
+            >
+              Hata: {(video as { errorMessage?: string }).errorMessage}
+            </Alert>
+          )}
+      </Paper>
+    </Stack>
   );
 }

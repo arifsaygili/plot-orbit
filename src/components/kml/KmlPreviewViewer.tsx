@@ -1,6 +1,34 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import {
+  Box,
+  Stack,
+  Text,
+  Loader,
+  Alert,
+  ScrollArea,
+  Accordion,
+  Group,
+  Badge,
+  Select,
+  Switch,
+  Slider,
+  Button,
+  Progress,
+} from "@mantine/core";
+import {
+  IconAlertCircle,
+  IconSettings,
+  IconTarget,
+  IconRotate360,
+  IconVideo,
+  IconPlayerPlay,
+  IconPlayerStop,
+  IconDownload,
+  IconRefresh,
+  IconEye,
+} from "@tabler/icons-react";
 import { getFileDownloadUrl } from "@/client/api/filesClient";
 import {
   getEntitiesInfo,
@@ -9,7 +37,6 @@ import {
   highlightEntity,
   unhighlightEntity,
   initIon,
-  getIonStatus,
   enableTerrain,
   disableTerrain,
   configureCameraLimits,
@@ -23,20 +50,19 @@ import {
   type IonStatus,
   type OrbitTarget,
 } from "@/lib/cesium";
-import { TargetSelector } from "./TargetSelector";
 import {
-  SceneSettingsPanel,
   defaultSceneSettings,
   type SceneSettings,
 } from "./SceneSettingsPanel";
-import { OrbitPanel, useOrbit } from "@/components/orbit";
+import { useOrbit } from "@/components/orbit";
+import { ORBIT_PRESETS } from "@/components/orbit/orbitPresets";
+import { DEFAULT_SAFETY_LIMITS } from "@/lib/cesium/orbit";
 import {
-  RecordPanel,
-  OverlayPanel,
-  ReelsWizard,
   useRecordFlow,
   getOutputPreset,
+  OUTPUT_PRESETS,
 } from "@/components/record";
+import { downloadRecording } from "@/client/recording";
 import type { Viewer as CesiumViewer, KmlDataSource, Entity } from "cesium";
 
 interface Props {
@@ -86,7 +112,6 @@ export function KmlPreviewViewer({ fileId, fileName }: Props) {
     startOrbit,
     startPreview,
     stopOrbit,
-    resetConfig,
   } = useOrbit(viewerRef.current, cesiumRef.current, orbitTarget);
 
   // Record flow hook
@@ -98,12 +123,10 @@ export function KmlPreviewViewer({ fileId, fileName }: Props) {
     result: recordResult,
     isSupported: isRecordingSupported,
     outputPreset,
-    overlayConfig,
     startRecording,
     stopRecording,
     reset: resetRecording,
     setOutputPreset,
-    setOverlayConfig,
   } = useRecordFlow(
     viewerRef.current,
     cesiumRef.current,
@@ -115,6 +138,7 @@ export function KmlPreviewViewer({ fileId, fileName }: Props) {
   // Get current preset info for aspect ratio
   const currentPreset = getOutputPreset(outputPreset);
   const isReelsMode = outputPreset === "REELS_9_16";
+  const limits = DEFAULT_SAFETY_LIMITS;
 
   const handleSelectEntity = useCallback((entityId: string) => {
     const Cesium = cesiumRef.current;
@@ -147,15 +171,17 @@ export function KmlPreviewViewer({ fileId, fileName }: Props) {
 
   // Handle settings change
   const handleSettingsChange = useCallback(
-    async (newSettings: SceneSettings) => {
+    async (key: keyof SceneSettings, value: SceneSettings[keyof SceneSettings]) => {
       const Cesium = cesiumRef.current;
       const viewer = viewerRef.current;
       if (!Cesium || !viewer) return;
 
+      const newSettings = { ...sceneSettings, [key]: value };
+
       // Terrain toggle
-      if (newSettings.terrainEnabled !== sceneSettings.terrainEnabled) {
+      if (key === "terrainEnabled") {
         setIsTerrainLoading(true);
-        if (newSettings.terrainEnabled) {
+        if (value) {
           await enableTerrain(viewer, Cesium);
         } else {
           await disableTerrain(viewer, Cesium);
@@ -164,18 +190,18 @@ export function KmlPreviewViewer({ fileId, fileName }: Props) {
       }
 
       // Imagery preset
-      if (newSettings.imageryPreset !== sceneSettings.imageryPreset) {
-        await setImageryPreset(viewer, newSettings.imageryPreset, Cesium);
+      if (key === "imageryPreset") {
+        await setImageryPreset(viewer, value as "satellite" | "roadmap", Cesium);
       }
 
       // Quality preset
-      if (newSettings.qualityPreset !== sceneSettings.qualityPreset) {
-        applyQualityPreset(viewer, newSettings.qualityPreset, Cesium);
+      if (key === "qualityPreset") {
+        applyQualityPreset(viewer, value as "low" | "medium" | "high", Cesium);
       }
 
       // Buildings toggle
-      if (newSettings.buildingsEnabled !== sceneSettings.buildingsEnabled) {
-        if (newSettings.buildingsEnabled) {
+      if (key === "buildingsEnabled") {
+        if (value) {
           await enableBuildings(viewer, Cesium);
         } else {
           disableBuildings(viewer);
@@ -183,14 +209,36 @@ export function KmlPreviewViewer({ fileId, fileName }: Props) {
       }
 
       // Lighting toggle
-      if (newSettings.lightingEnabled !== sceneSettings.lightingEnabled) {
-        setLighting(viewer, newSettings.lightingEnabled);
+      if (key === "lightingEnabled") {
+        setLighting(viewer, value as boolean);
       }
 
       setSceneSettings(newSettings);
     },
     [sceneSettings]
   );
+
+  const formatCoord = (value: number) => value.toFixed(6);
+  const formatRadius = (meters: number) => {
+    if (meters >= 1000) return `${(meters / 1000).toFixed(2)} km`;
+    return `${meters.toFixed(0)} m`;
+  };
+
+  const formatTime = (ms: number) => {
+    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${minutes}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  const handleDownload = () => {
+    if (recordResult) {
+      downloadRecording(
+        { blob: recordResult.blob, durationMs: recordResult.durationMs, mimeType: "video/webm", objectUrl: recordResult.objectUrl },
+        `orbit-video-${recordResult.videoId}.webm`
+      );
+    }
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -292,7 +340,7 @@ export function KmlPreviewViewer({ fileId, fileName }: Props) {
       } catch (err) {
         console.error("KML preview error:", err);
         if (mounted) {
-          setError(err instanceof Error ? err.message : "Failed to load KML");
+          setError(err instanceof Error ? err.message : "KML yüklenemedi");
           setIsLoading(false);
         }
       }
@@ -316,132 +364,501 @@ export function KmlPreviewViewer({ fileId, fileName }: Props) {
     };
   }, [fileId]);
 
+  const isRecording = flowState === "recording";
+  const isProcessing = flowState === "processing" || flowState === "uploading";
+  const isComplete = flowState === "complete";
+  const isError = flowState === "error";
+  const isIdle = flowState === "idle";
+
   return (
-    <div className="relative w-full h-full min-h-[500px] flex items-center justify-center bg-gray-950">
-      {isLoading && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900 z-10">
-          <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4" />
-          <p className="text-white">Loading {fileName}...</p>
-        </div>
-      )}
-
-      {error && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900 z-10">
-          <div className="text-red-400 text-center">
-            <svg
-              className="w-16 h-16 mx-auto mb-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+    <Box style={{ display: "flex", height: "100%", background: "var(--mantine-color-gray-1)" }}>
+      {/* Left Panel - Controls (320px fixed width) */}
+      <Box
+        style={{
+          width: "320px",
+          minWidth: "320px",
+          height: "100%",
+          borderRight: "1px solid var(--mantine-color-gray-3)",
+          background: "white",
+        }}
+      >
+        <ScrollArea h="100%" type="auto">
+          <Stack gap={0} p="md">
+            <Accordion
+              multiple
+              defaultValue={["target", "scene", "orbit", "record"]}
+              styles={{
+                item: {
+                  borderBottom: "1px solid var(--mantine-color-gray-2)",
+                },
+                control: {
+                  padding: "var(--mantine-spacing-sm)",
+                },
+                panel: {
+                  padding: "var(--mantine-spacing-sm)",
+                },
+              }}
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-              />
-            </svg>
-            <p className="text-lg font-medium">Failed to load KML</p>
-            <p className="text-sm text-gray-400 mt-1">{error}</p>
-          </div>
-        </div>
-      )}
+              {/* Target Selection */}
+              <Accordion.Item value="target">
+                <Accordion.Control icon={<IconTarget size={18} color="var(--mantine-color-teal-6)" />}>
+                  <Text fw={600} fz="sm" c="dark.7">Hedef Seçimi</Text>
+                </Accordion.Control>
+                <Accordion.Panel>
+                  <Stack gap="sm">
+                    <Text fz="xs" c="dimmed">
+                      {entities.length} alan bulundu
+                    </Text>
+                    <Box
+                      style={{
+                        maxHeight: 150,
+                        overflowY: "auto",
+                        border: "1px solid var(--mantine-color-gray-3)",
+                        borderRadius: "var(--mantine-radius-md)",
+                      }}
+                    >
+                      {entities.length === 0 ? (
+                        <Text fz="sm" c="dimmed" ta="center" p="md">
+                          Seçilebilir alan bulunamadı
+                        </Text>
+                      ) : (
+                        entities.map((entity) => (
+                          <Box
+                            key={entity.id}
+                            onClick={() => handleSelectEntity(entity.id)}
+                            p="xs"
+                            style={{
+                              cursor: "pointer",
+                              borderBottom: "1px solid var(--mantine-color-gray-2)",
+                              background: selectedEntityId === entity.id ? "var(--mantine-color-teal-0)" : undefined,
+                            }}
+                          >
+                            <Group justify="space-between">
+                              <Text fz="sm" c={selectedEntityId === entity.id ? "teal.7" : "dark.6"} truncate maw={180}>
+                                {entity.name}
+                              </Text>
+                              <Badge size="xs" variant="light" color={entity.type === "polygon" ? "teal" : "violet"}>
+                                {entity.type}
+                              </Badge>
+                            </Group>
+                          </Box>
+                        ))
+                      )}
+                    </Box>
 
-      {/* Viewer container with aspect ratio based on preset */}
-      <div
-        ref={containerRef}
-        className={`relative ${
-          isReelsMode
-            ? "h-full max-h-full"
-            : "w-full h-full"
-        }`}
-        style={
-          isReelsMode
-            ? {
-                aspectRatio: currentPreset.aspectRatio,
-                maxWidth: "100%",
-              }
-            : undefined
-        }
-      />
+                    {boundingInfo && (
+                      <Stack gap="xs">
+                        <Text fz="xs" c="dimmed" tt="uppercase" fw={600}>Merkez</Text>
+                        <Group gap="xs">
+                          <Badge variant="light" color="gray" size="sm">
+                            Lat: {formatCoord(boundingInfo.center.latitude)}
+                          </Badge>
+                          <Badge variant="light" color="gray" size="sm">
+                            Lng: {formatCoord(boundingInfo.center.longitude)}
+                          </Badge>
+                        </Group>
+                        <Badge variant="light" color="teal" size="md">
+                          Önerilen Yarıçap: {formatRadius(boundingInfo.radius)}
+                        </Badge>
+                      </Stack>
+                    )}
+                  </Stack>
+                </Accordion.Panel>
+              </Accordion.Item>
 
-      {/* Panels */}
-      {!isLoading && !error && (
-        <>
-          {/* Target Selection Panel - Right */}
-          <div className="absolute top-4 right-4 z-20 space-y-4">
-            <TargetSelector
-              entities={entities}
-              selectedEntityId={selectedEntityId}
-              boundingInfo={boundingInfo}
-              onSelectEntity={handleSelectEntity}
-            />
+              {/* Scene Settings */}
+              <Accordion.Item value="scene">
+                <Accordion.Control icon={<IconSettings size={18} color="var(--mantine-color-teal-6)" />}>
+                  <Text fw={600} fz="sm" c="dark.7">Sahne Ayarları</Text>
+                </Accordion.Control>
+                <Accordion.Panel>
+                  <Stack gap="md">
+                    {/* Ion Status */}
+                    <Group gap="xs">
+                      <Box
+                        style={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: "50%",
+                          background: ionStatus.enabled ? "var(--mantine-color-green-5)" : "var(--mantine-color-yellow-5)",
+                        }}
+                      />
+                      <Text fz="xs" c="dimmed">
+                        {ionStatus.enabled ? "Ion aktif" : "Ion devre dışı"}
+                      </Text>
+                    </Group>
 
-            {/* Reels Wizard - Quick access */}
-            {flowState === "idle" && (
-              <ReelsWizard
-                outputPreset={outputPreset}
-                overlayConfig={overlayConfig}
-                onPresetChange={setOutputPreset}
-                onOverlayChange={setOverlayConfig}
-                onGenerate={startRecording}
-                disabled={!orbitTarget || orbitState.isRunning}
-                isRecording={flowState !== "idle"}
-              />
-            )}
-          </div>
+                    <Switch
+                      label="Arazi"
+                      checked={sceneSettings.terrainEnabled}
+                      onChange={(e) => handleSettingsChange("terrainEnabled", e.currentTarget.checked)}
+                      disabled={!ionStatus.enabled || isTerrainLoading}
+                      color="teal"
+                      size="sm"
+                    />
 
-          {/* Scene Settings Panel - Left */}
-          <div className="absolute top-4 left-4 z-20 space-y-4">
-            <SceneSettingsPanel
-              ionStatus={ionStatus}
-              settings={sceneSettings}
-              onSettingsChange={handleSettingsChange}
-              isTerrainLoading={isTerrainLoading}
-            />
+                    <Select
+                      label="Görüntü"
+                      size="xs"
+                      value={sceneSettings.imageryPreset}
+                      onChange={(v) => v && handleSettingsChange("imageryPreset", v as "satellite" | "roadmap")}
+                      data={[
+                        { value: "satellite", label: "Uydu" },
+                        { value: "roadmap", label: "Yol Haritası" },
+                      ]}
+                    />
 
-            {/* Orbit Controls Panel - Below Scene Settings */}
-            <OrbitPanel
-              config={orbitConfig}
-              orbitState={orbitState}
-              presetId={presetId}
-              onPresetChange={setPreset}
-              onConfigChange={updateConfig}
-              onStart={startOrbit}
-              onPreview={startPreview}
-              onStop={stopOrbit}
-              onReset={resetConfig}
-              disabled={!orbitTarget || flowState !== "idle"}
-            />
+                    <Select
+                      label="Kalite"
+                      size="xs"
+                      value={sceneSettings.qualityPreset}
+                      onChange={(v) => v && handleSettingsChange("qualityPreset", v as "low" | "medium" | "high")}
+                      data={[
+                        { value: "low", label: "Düşük (Performans)" },
+                        { value: "medium", label: "Orta" },
+                        { value: "high", label: "Yüksek (Kalite)" },
+                      ]}
+                    />
 
-            {/* Record Panel - Below Orbit Controls */}
-            <RecordPanel
-              flowState={flowState}
-              progress={recordProgress}
-              elapsedMs={recordElapsedMs}
-              durationMs={orbitConfig.durationSec * 1000}
-              error={recordError}
-              result={recordResult}
-              isSupported={isRecordingSupported}
-              outputPreset={outputPreset}
-              onOutputPresetChange={setOutputPreset}
-              onStart={startRecording}
-              onStop={stopRecording}
-              onReset={resetRecording}
-              disabled={!orbitTarget || orbitState.isRunning}
-            />
+                    <Switch
+                      label="3D Binalar"
+                      checked={sceneSettings.buildingsEnabled}
+                      onChange={(e) => handleSettingsChange("buildingsEnabled", e.currentTarget.checked)}
+                      disabled={!ionStatus.enabled}
+                      color="teal"
+                      size="sm"
+                    />
 
-            {/* Overlay Panel - Only shown for Reels mode */}
-            {isReelsMode && flowState === "idle" && (
-              <OverlayPanel
-                config={overlayConfig}
-                onChange={setOverlayConfig}
-                disabled={!orbitTarget || orbitState.isRunning}
-              />
-            )}
-          </div>
-        </>
-      )}
-    </div>
+                    <Switch
+                      label="Aydınlatma"
+                      checked={sceneSettings.lightingEnabled}
+                      onChange={(e) => handleSettingsChange("lightingEnabled", e.currentTarget.checked)}
+                      color="teal"
+                      size="sm"
+                    />
+                  </Stack>
+                </Accordion.Panel>
+              </Accordion.Item>
+
+              {/* Orbit Controls */}
+              <Accordion.Item value="orbit">
+                <Accordion.Control icon={<IconRotate360 size={18} color="var(--mantine-color-teal-6)" />}>
+                  <Text fw={600} fz="sm" c="dark.7">Orbit Kontrolü</Text>
+                </Accordion.Control>
+                <Accordion.Panel>
+                  <Stack gap="md">
+                    {orbitState.isRunning && (
+                      <Box>
+                        <Group justify="space-between" mb={4}>
+                          <Text fz="xs" c="dimmed">
+                            {orbitState.isPreviewMode ? "Önizleme" : "Orbit"} İlerlemesi
+                          </Text>
+                          <Text fz="xs" c="dimmed">{Math.round(orbitState.progress * 100)}%</Text>
+                        </Group>
+                        <Progress value={orbitState.progress * 100} color="teal" size="sm" radius="md" />
+                      </Box>
+                    )}
+
+                    <Select
+                      label="Preset"
+                      size="xs"
+                      value={presetId}
+                      onChange={(v) => v && setPreset(v)}
+                      disabled={orbitState.isRunning || !orbitTarget || flowState !== "idle"}
+                      data={ORBIT_PRESETS.map((p) => ({ value: p.id, label: p.name }))}
+                    />
+
+                    <Box>
+                      <Group justify="space-between" mb={4}>
+                        <Text fz="xs" c="dark.5">Süre</Text>
+                        <Text fz="xs" c="dark.5">{orbitConfig.durationSec}s</Text>
+                      </Group>
+                      <Slider
+                        value={orbitConfig.durationSec}
+                        onChange={(v) => updateConfig({ durationSec: v })}
+                        min={limits.minDurationSec}
+                        max={limits.maxDurationSec}
+                        disabled={orbitState.isRunning || !orbitTarget || flowState !== "idle"}
+                        color="teal"
+                        size="sm"
+                      />
+                    </Box>
+
+                    <Box>
+                      <Group justify="space-between" mb={4}>
+                        <Text fz="xs" c="dark.5">FPS</Text>
+                        <Text fz="xs" c="dark.5">{orbitConfig.fps}</Text>
+                      </Group>
+                      <Slider
+                        value={orbitConfig.fps}
+                        onChange={(v) => updateConfig({ fps: v })}
+                        min={limits.minFps}
+                        max={limits.maxFps}
+                        step={5}
+                        disabled={orbitState.isRunning || !orbitTarget || flowState !== "idle"}
+                        color="teal"
+                        size="sm"
+                      />
+                    </Box>
+
+                    <Box>
+                      <Group justify="space-between" mb={4}>
+                        <Text fz="xs" c="dark.5">Yarıçap</Text>
+                        <Text fz="xs" c="dark.5">{Math.round(orbitConfig.radiusMeters)}m</Text>
+                      </Group>
+                      <Slider
+                        value={orbitConfig.radiusMeters}
+                        onChange={(v) => updateConfig({ radiusMeters: v })}
+                        min={limits.minRadiusMeters}
+                        max={Math.min(limits.maxRadiusMeters, orbitConfig.radiusMeters * 3)}
+                        step={50}
+                        disabled={orbitState.isRunning || !orbitTarget || flowState !== "idle"}
+                        color="teal"
+                        size="sm"
+                      />
+                    </Box>
+
+                    <Box>
+                      <Group justify="space-between" mb={4}>
+                        <Text fz="xs" c="dark.5">Eğim</Text>
+                        <Text fz="xs" c="dark.5">{orbitConfig.pitchDeg}°</Text>
+                      </Group>
+                      <Slider
+                        value={orbitConfig.pitchDeg}
+                        onChange={(v) => updateConfig({ pitchDeg: v })}
+                        min={limits.minPitchDeg}
+                        max={limits.maxPitchDeg}
+                        step={5}
+                        disabled={orbitState.isRunning || !orbitTarget || flowState !== "idle"}
+                        color="teal"
+                        size="sm"
+                      />
+                    </Box>
+
+                    <Group gap="xs">
+                      {orbitState.isRunning ? (
+                        <Button
+                          fullWidth
+                          color="red"
+                          leftSection={<IconPlayerStop size={16} />}
+                          onClick={stopOrbit}
+                        >
+                          Durdur
+                        </Button>
+                      ) : (
+                        <>
+                          <Button
+                            flex={1}
+                            variant="light"
+                            color="teal"
+                            leftSection={<IconEye size={16} />}
+                            onClick={startPreview}
+                            disabled={!orbitTarget || flowState !== "idle"}
+                          >
+                            Önizle
+                          </Button>
+                          <Button
+                            flex={1}
+                            color="teal"
+                            leftSection={<IconPlayerPlay size={16} />}
+                            onClick={startOrbit}
+                            disabled={!orbitTarget || flowState !== "idle"}
+                          >
+                            Başlat
+                          </Button>
+                        </>
+                      )}
+                    </Group>
+                  </Stack>
+                </Accordion.Panel>
+              </Accordion.Item>
+
+              {/* Record */}
+              <Accordion.Item value="record">
+                <Accordion.Control icon={<IconVideo size={18} color="var(--mantine-color-red-6)" />}>
+                  <Group gap="xs">
+                    <Text fw={600} fz="sm" c="dark.7">Video Kayıt</Text>
+                    {isRecording && (
+                      <Box
+                        style={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: "50%",
+                          background: "var(--mantine-color-red-5)",
+                          animation: "pulse 1s infinite",
+                        }}
+                      />
+                    )}
+                  </Group>
+                </Accordion.Control>
+                <Accordion.Panel>
+                  <Stack gap="md">
+                    {!isRecordingSupported && (
+                      <Alert icon={<IconAlertCircle size={16} />} color="red" variant="light" radius="md">
+                        Bu tarayıcıda video kaydı desteklenmiyor. Chrome, Edge veya Firefox kullanın.
+                      </Alert>
+                    )}
+
+                    {isError && recordError && (
+                      <Alert icon={<IconAlertCircle size={16} />} color="red" variant="light" radius="md">
+                        {recordError}
+                      </Alert>
+                    )}
+
+                    {isIdle && (
+                      <Select
+                        label="Çıktı Formatı"
+                        size="xs"
+                        value={outputPreset}
+                        onChange={(v) => v && setOutputPreset(v as typeof outputPreset)}
+                        disabled={!orbitTarget || orbitState.isRunning}
+                        data={OUTPUT_PRESETS.map((p) => ({ value: p.id, label: p.name }))}
+                      />
+                    )}
+
+                    {(isRecording || flowState === "creating") && (
+                      <Box>
+                        <Group justify="space-between" mb={4}>
+                          <Text fz="xs" c="dimmed">{formatTime(recordElapsedMs)}</Text>
+                          <Text fz="xs" c="dimmed">{formatTime(orbitConfig.durationSec * 1000)}</Text>
+                        </Group>
+                        <Progress value={recordProgress} color="red" size="sm" radius="md" />
+                      </Box>
+                    )}
+
+                    {isProcessing && (
+                      <Group justify="center" py="md">
+                        <Loader size="sm" color="teal" />
+                        <Text fz="sm" c="dimmed">
+                          {flowState === "uploading" ? "Yükleniyor..." : "İşleniyor..."}
+                        </Text>
+                      </Group>
+                    )}
+
+                    {isComplete && recordResult && (
+                      <Stack gap="sm">
+                        <video
+                          src={recordResult.objectUrl}
+                          controls
+                          style={{ width: "100%", borderRadius: "var(--mantine-radius-md)", maxHeight: 150 }}
+                        />
+                        <Button
+                          color="green"
+                          leftSection={<IconDownload size={16} />}
+                          onClick={handleDownload}
+                          fullWidth
+                        >
+                          İndir
+                        </Button>
+                      </Stack>
+                    )}
+
+                    <Group gap="xs">
+                      {isIdle && (
+                        <Button
+                          fullWidth
+                          color="red"
+                          leftSection={<Box style={{ width: 10, height: 10, borderRadius: "50%", background: "white" }} />}
+                          onClick={startRecording}
+                          disabled={!orbitTarget || orbitState.isRunning || !isRecordingSupported}
+                        >
+                          Kaydet
+                        </Button>
+                      )}
+
+                      {isRecording && (
+                        <Button
+                          fullWidth
+                          variant="light"
+                          color="gray"
+                          leftSection={<IconPlayerStop size={16} />}
+                          onClick={stopRecording}
+                        >
+                          Durdur
+                        </Button>
+                      )}
+
+                      {(isComplete || isError) && (
+                        <Button
+                          fullWidth
+                          variant="light"
+                          color="gray"
+                          leftSection={<IconRefresh size={16} />}
+                          onClick={resetRecording}
+                        >
+                          Yeni Kayıt
+                        </Button>
+                      )}
+                    </Group>
+                  </Stack>
+                </Accordion.Panel>
+              </Accordion.Item>
+            </Accordion>
+          </Stack>
+        </ScrollArea>
+      </Box>
+
+      {/* Right Panel - Map (flex: 1) */}
+      <Box style={{ flex: 1, position: "relative", background: "var(--mantine-color-dark-9)" }}>
+        {isLoading && (
+          <Box
+            style={{
+              position: "absolute",
+              inset: 0,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "var(--mantine-color-dark-9)",
+              zIndex: 10,
+            }}
+          >
+            <Loader size="lg" color="teal" mb="md" />
+            <Text c="white">{fileName} yükleniyor...</Text>
+          </Box>
+        )}
+
+        {error && (
+          <Box
+            style={{
+              position: "absolute",
+              inset: 0,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "var(--mantine-color-dark-9)",
+              zIndex: 10,
+            }}
+          >
+            <Alert
+              icon={<IconAlertCircle size={16} />}
+              color="red"
+              variant="filled"
+              radius="lg"
+            >
+              <Text fw={500}>KML Yüklenemedi</Text>
+              <Text fz="sm">{error}</Text>
+            </Alert>
+          </Box>
+        )}
+
+        {/* Viewer container with aspect ratio based on preset */}
+        <Box
+          ref={containerRef}
+          style={{
+            width: isReelsMode ? undefined : "100%",
+            height: "100%",
+            ...(isReelsMode
+              ? {
+                  aspectRatio: currentPreset.aspectRatio,
+                  maxWidth: "100%",
+                  margin: "0 auto",
+                }
+              : {}),
+          }}
+        />
+      </Box>
+    </Box>
   );
 }

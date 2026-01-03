@@ -204,10 +204,8 @@ function calculateBoundingInfo(
   const centerLat = sumLat / count;
   const centerHeight = sumHeight / count;
 
-  // Calculate radius based on bounding sphere
-  const boundingSphere = Cesium.BoundingSphere.fromPoints(positions);
-  // Suggested orbit radius is ~2-3x the bounding sphere radius
-  const suggestedRadius = Math.max(boundingSphere.radius * 2.5, 500);
+  // Default suggested orbit radius is 100m
+  const suggestedRadius = 100;
 
   return {
     center: {

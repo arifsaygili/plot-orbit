@@ -1,49 +1,203 @@
-import { requireAuth } from "@/server/auth";
-import { LogoutButton } from "./LogoutButton";
+"use client";
 
-export default async function DashboardPage() {
-  const { user, tenant } = await requireAuth();
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import {
+  Container,
+  Stack,
+  Title,
+  Text,
+  Button,
+  Group,
+  Paper,
+  SimpleGrid,
+  Skeleton,
+  Alert,
+} from "@mantine/core";
+import { notifications } from "@mantine/notifications";
+import {
+  IconRocket,
+  IconPlayerPlay,
+  IconInfoCircle,
+  IconGift,
+  IconMovie,
+  IconClock,
+} from "@tabler/icons-react";
+import {
+  QuickStartStepper,
+  StatsRow,
+  RecentItemsCard,
+  type RecentItem,
+} from "@/components/dashboard";
+
+// TODO: Fetch real data from APIs
+interface DashboardData {
+  recentKmls: RecentItem[];
+  recentVideos: RecentItem[];
+  stats: {
+    freeVideosRemaining: number;
+    totalVideos: number;
+    lastActivity: string | null;
+  };
+}
+
+function HeroSection() {
+  const handleSampleKml = () => {
+    notifications.show({
+      title: "Yakında",
+      message: "Örnek KML özelliği yakında aktif olacak.",
+      color: "blue",
+      icon: <IconInfoCircle size={16} />,
+    });
+  };
 
   return (
-    <div className="min-h-screen bg-zinc-900 p-8">
-      <div className="mx-auto max-w-4xl">
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold text-white">Dashboard</h1>
-          <LogoutButton />
+    <Paper
+      shadow="sm"
+      radius="lg"
+      p="xl"
+      withBorder
+      style={{
+        background: "linear-gradient(135deg, var(--mantine-color-teal-0) 0%, var(--mantine-color-white) 100%)",
+      }}
+    >
+      <Stack gap="md">
+        <div>
+          <Title order={2} c="dark.7">
+            Bugün ne üretelim?
+          </Title>
+          <Text fz="md" c="dimmed" mt="xs">
+            KML'yi yükle → Parseli seç → Orbit → Video'yu indir veya Reels hazırla.
+          </Text>
         </div>
 
-        <div className="mt-8 rounded-lg border border-zinc-700 bg-zinc-800 p-6">
-          <h2 className="text-xl font-semibold text-white">Welcome!</h2>
-          <div className="mt-4 space-y-2 text-zinc-300">
-            <p>
-              <span className="text-zinc-500">Logged in as:</span>{" "}
-              {user.name || user.email}
-            </p>
-            <p>
-              <span className="text-zinc-500">Email:</span> {user.email}
-            </p>
-            <p>
-              <span className="text-zinc-500">Role:</span> {user.role}
-            </p>
-            <p>
-              <span className="text-zinc-500">Organization:</span>{" "}
-              {tenant.name} ({tenant.slug})
-            </p>
-          </div>
-        </div>
+        <Group gap="sm">
+          <Button
+            size="md"
+            color="teal"
+            leftSection={<IconRocket size={18} />}
+            component={Link}
+            href="/kml"
+          >
+            Hızlı Başlat
+          </Button>
+          <Button
+            size="md"
+            variant="light"
+            color="gray"
+            leftSection={<IconPlayerPlay size={18} />}
+            onClick={handleSampleKml}
+          >
+            Örnek KML ile dene
+          </Button>
+        </Group>
+      </Stack>
+    </Paper>
+  );
+}
 
-        <div className="mt-6 rounded-lg border border-zinc-700 bg-zinc-800 p-6">
-          <h3 className="text-lg font-medium text-white">Quick Links</h3>
-          <div className="mt-4 flex gap-4">
-            <a
-              href="/viewer"
-              className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-            >
-              Open Viewer
-            </a>
-          </div>
-        </div>
-      </div>
-    </div>
+function LoadingState() {
+  return (
+    <Container size="lg" py="xl">
+      <Stack gap="lg">
+        <Skeleton height={140} radius="lg" />
+        <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md">
+          <Skeleton height={100} radius="lg" />
+          <Skeleton height={100} radius="lg" />
+          <Skeleton height={100} radius="lg" />
+        </SimpleGrid>
+        <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
+          <Skeleton height={300} radius="lg" />
+          <Skeleton height={300} radius="lg" />
+        </SimpleGrid>
+      </Stack>
+    </Container>
+  );
+}
+
+export default function DashboardPage() {
+  const [isLoading, setIsLoading] = useState(true);
+  const [data, setData] = useState<DashboardData>({
+    recentKmls: [],
+    recentVideos: [],
+    stats: {
+      freeVideosRemaining: 1,
+      totalVideos: 0,
+      lastActivity: null,
+    },
+  });
+
+  useEffect(() => {
+    // TODO: Fetch real data from APIs
+    // For now, simulate loading
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (isLoading) {
+    return <LoadingState />;
+  }
+
+  return (
+    <Container size="lg" py="xl">
+      <Stack gap="lg">
+        {/* Hero / Welcome Section */}
+        <HeroSection />
+
+        {/* Stats Row */}
+        <StatsRow
+          stats={[
+            {
+              id: "free-videos",
+              label: "Kalan Free Video",
+              value: data.stats.freeVideosRemaining,
+              icon: IconGift,
+              color: "teal",
+              description: "Free plan kredisi",
+            },
+            {
+              id: "total-videos",
+              label: "Toplam Video",
+              value: data.stats.totalVideos,
+              icon: IconMovie,
+              color: "blue",
+              description: "Oluşturulan videolar",
+            },
+            {
+              id: "last-activity",
+              label: "Son İşlem",
+              value: data.stats.lastActivity || "—",
+              icon: IconClock,
+              color: "gray",
+              description: "Son aktivite",
+            },
+          ]}
+        />
+
+        {/* Quick Start Stepper */}
+        <QuickStartStepper />
+
+        {/* Recent Items */}
+        <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
+          <RecentItemsCard
+            title="Son KML'ler"
+            type="kml"
+            items={data.recentKmls}
+            viewAllHref="/kml"
+            createHref="/kml"
+          />
+          <RecentItemsCard
+            title="Son Videolar"
+            type="video"
+            items={data.recentVideos}
+            viewAllHref="/videos"
+            createHref="/kml"
+          />
+        </SimpleGrid>
+      </Stack>
+    </Container>
   );
 }
